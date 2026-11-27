@@ -10599,6 +10599,10 @@ export type Database = {
         }
       }
       list_assignment_locations: { Args: { p_context: Json }; Returns: Json }
+      list_form_user_options: {
+        Args: { p_template_id: string; p_field_key: string; p_expanded?: boolean; p_selected_user_id?: string }
+        Returns: { id: string; label: string }[]
+      }
       search_assignment_recipients: {
         Args: {
           p_branch_id: string

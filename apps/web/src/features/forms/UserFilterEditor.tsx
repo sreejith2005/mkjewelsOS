@@ -29,8 +29,7 @@ function choicesFor(attribute: FormUserFilterAttribute, options: DynamicOptions)
 
 /**
  * "Who can be chosen" on a Users question (migration 0391): rules on department, designation,
- * store, franchise, role or name, matched all or any. The form lists only matching people and
- * the server refuses anyone else on submit.
+ * store, franchise, role or name, matched all or any. These rules set the initial list.
  */
 export function UserFilterEditor({ value, options, onChange }: { value: FormUserFilter | undefined; options: DynamicOptions; onChange: (next: FormUserFilter | undefined) => void }) {
   const filter: FormUserFilter = value ?? { match: "all", rules: [] };
@@ -46,7 +45,7 @@ export function UserFilterEditor({ value, options, onChange }: { value: FormUser
   return <details className="rounded-lg border border-gold/15 bg-obsidian/30 p-3 sm:col-span-2" open={!!value}>
     <summary className="cursor-pointer text-sm font-semibold text-champagne">Who can be chosen{value ? ` (${filter.rules.length} rule${filter.rules.length === 1 ? "" : "s"})` : ": everyone"}</summary>
     <div className="mt-3 space-y-3">
-      <p className="text-xs text-soft-grey">Only active employees the person filling the form can see are ever listed. Rules narrow that list, for example Department is equal to Sales.</p>
+      <p className="text-xs text-soft-grey">Set the initial list of active employees, for example Department is equal to Sales. People filling the form can also choose someone outside the department or at another store.</p>
       {filter.rules.length > 1 ? <label className="block text-sm text-champagne">People must match
         <select aria-label="People must match" className="field mt-1" onChange={(event) => set(filter.rules, event.target.value === "any" ? "any" : "all")} value={filter.match}>
           <option value="all">All rules (AND)</option><option value="any">Any rule (OR)</option>

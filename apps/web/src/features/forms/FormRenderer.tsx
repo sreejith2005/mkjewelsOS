@@ -1,13 +1,13 @@
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Check, ChevronLeft, ChevronRight, Paperclip } from "lucide-react";
-import { describeFormRule, formUserMatchesFilter, isCompletePhone, evaluateFormNavigation, displayFormAnswer, FORM_OTHER_MAX_LENGTH, formFieldAllowsOther, formOptionValues, reconcileFormPreviewAnswers, formCompletionProgress, formUsesSteps, isFinalFormStep, nextFormStepKey, normalizeFormAnswers, previousFormStepKey, resolveFormOptions, updateVisibleFormAnswers, validateCompleteForm, validateFormStep, visibleFormSections, type FormAnswer, type FormAnswers, type FormFieldDefinition, type FormMasterOption, type FormTemplateDefinition, type FormValidationIssue, type FormCrmServices, clientDetailsForForm, formChoiceValueFromText, isClientPhoneQuestion, isPincodeQuestion } from "@jewelos/core";
+import { describeFormRule, isCompletePhone, evaluateFormNavigation, displayFormAnswer, FORM_OTHER_MAX_LENGTH, formFieldAllowsOther, formOptionValues, reconcileFormPreviewAnswers, formCompletionProgress, formUsesSteps, isFinalFormStep, nextFormStepKey, normalizeFormAnswers, previousFormStepKey, resolveFormOptions, updateVisibleFormAnswers, validateCompleteForm, validateFormStep, visibleFormSections, type FormAnswer, type FormAnswers, type FormFieldDefinition, type FormMasterOption, type FormTemplateDefinition, type FormValidationIssue, type FormCrmServices, clientDetailsForForm, formChoiceValueFromText, isClientPhoneQuestion, isPincodeQuestion } from "@jewelos/core";
 import { Button, Notice } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { signedFormFileUrl, uploadFormFile } from "./api";
 import { RatingField } from "./RatingField";
 import { CrmChoiceField, CrmPhotoField, RepeatField } from "./CrmQuestions";
 import { useFormCrmServices } from "./crmServicesContext";
-import { CrossLocationEmployeePicker } from "@/features/users/CrossLocationEmployeePicker";
+import { FormUserField } from "./FormUserField";
 import { FormPhoneInput } from "./FormPhoneInput";
 
 /**
@@ -25,7 +25,7 @@ export type DynamicOptions = {
 };
 const EMPTY_OPTIONS: DynamicOptions = { users: [], branches: [], departments: [], masters: [] };
 const NUMBER_TYPES = new Set(["number", "currency", "rating"]);
-const SELECT_TYPES = new Set(["select", "user_dropdown", "branch_dropdown", "department_dropdown"]);
+const SELECT_TYPES = new Set(["select", "branch_dropdown", "department_dropdown"]);
 const LAYOUT_TYPES = new Set(["section_header", "divider"]);
 const OPTION_ROW = "flex min-h-12 cursor-pointer items-center gap-3 rounded-xl border border-task-border bg-task-bg px-3.5 py-2.5 text-[15px] text-task-text transition hover:border-gold/50 has-[:checked]:border-gold has-[:checked]:bg-gold/10 has-[:checked]:font-medium has-[:disabled]:cursor-not-allowed sm:text-sm [&>input]:size-5 [&>input]:shrink-0 [&>input]:accent-gold";
 /** The UI-only dropdown value for "Other"; the stored answer is always the typed text. */
@@ -116,6 +116,7 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, extra
   const [stepKey, setStepKey] = useState<string | null>(null);
   /** Questions where "Other" is picked but nothing is typed yet. */
   const [otherOpen, setOtherOpen] = useState<Readonly<Record<string, boolean>>>({});
+  const [selectedUserNames, setSelectedUserNames] = useState<ReadonlyMap<string, string>>(new Map());
   const otherInputs = useRef(new Map<string, HTMLInputElement>());
   const fieldRefs = useRef(new Map<string, HTMLElement>());
   /** CRM photo uploads still in progress; the form waits for them before submitting. */
@@ -143,14 +144,13 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, extra
   const showSectionTitles = (resolved.sections?.length ?? 0) > 1;
   const branchFieldKey = useMemo(() => resolved.fields.find((field) => field.type === "branch_dropdown")?.key, [resolved]);
   const lookups = useMemo(() => ({
-    users: new Map(dynamicOptions.users.map((item) => [item.id, item.label])),
+    users: new Map([...dynamicOptions.users.map((item) => [item.id, item.label] as const), ...selectedUserNames]),
     branches: new Map(dynamicOptions.branches.map((item) => [item.id, item.label])),
     departments: new Map(dynamicOptions.departments.map((item) => [item.id, item.label])),
-  }), [dynamicOptions]);
+  }), [dynamicOptions, selectedUserNames]);
   // People, branches and departments are always listed A to Z, whatever order they were loaded in.
   const sorted = useMemo(() => ({ users: byLabel(dynamicOptions.users), branches: byLabel(dynamicOptions.branches), departments: byLabel(dynamicOptions.departments) }), [dynamicOptions]);
-  // A Users question lists only the people its filter allows; the server refuses anyone else.
-  const optionsFor = (type: string, field?: FormFieldDefinition) => type === "user_dropdown" ? sorted.users.filter((person) => formUserMatchesFilter(field?.validation?.userFilter, person, lookups.departments)) : type === "branch_dropdown" ? sorted.branches : type === "department_dropdown" ? sorted.departments.filter((item) => !branchFieldKey || !answers[branchFieldKey] || item.branchId === answers[branchFieldKey]) : [];
+  const optionsFor = (type: string) => type === "branch_dropdown" ? sorted.branches : type === "department_dropdown" ? sorted.departments.filter((item) => !branchFieldKey || !answers[branchFieldKey] || item.branchId === answers[branchFieldKey]) : [];
   const openOther = (key: string, open: boolean) => {
     setOtherOpen((current) => ({ ...current, [key]: open }));
     if (open) requestAnimationFrame(() => otherInputs.current.get(key)?.focus());
@@ -286,9 +286,9 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, extra
     if (field.type === "crm_photo") return shell(<div><QuestionText field={field} id={labelId} />{helper}
       <CrmPhotoField crm={photoServices} describedBy={describedBy} disabled={disabled || preview} field={field} onBusyChange={(busy) => setUploadsBusy((count) => Math.max(0, count + (busy ? 1 : -1)))} onChange={(next) => set(field.key, next)} registerRef={register(field.key)} value={value} />{errorText}
     </div>);
-    // A Users question that allows other locations: Location -> Store -> Employee (migration 0386).
-    if (field.type === "user_dropdown" && field.assignmentScope === "cross_location") return shell(<div><QuestionText field={field} id={labelId} />{helper}
-      <CrossLocationEmployeePicker context={templateId && !preview ? { kind: "form", formTemplateId: templateId, fieldKey: field.key } : null} describedBy={describedBy} disabled={disabled} knownNames={sorted.users} labelledBy={labelId} onChange={(next) => set(field.key, next)} registerRef={register(field.key)} value={typeof value === "string" ? value : ""} />{errorText}
+    // Every Users question starts with its configured list and offers broader choices.
+    if (field.type === "user_dropdown") return shell(<div><QuestionText field={field} id={labelId} />{helper}
+      <FormUserField departmentNames={lookups.departments} describedBy={describedBy} disabled={disabled} field={field} labelledBy={labelId} onChange={(next) => set(field.key, next)} onPick={(person) => setSelectedUserNames((current) => new Map(current).set(person.id, person.label))} options={sorted.users} preview={preview} registerRef={register(field.key)} templateId={templateId} value={typeof value === "string" ? value : ""} />{errorText}
     </div>);
     const crmChoices = field.type === "text" ? crm?.choices?.(field.key) ?? null : null;
     if (crmChoices) return shell(<label className="block"><span className="mb-1.5 block"><QuestionText field={field} /></span>{helper}
@@ -297,7 +297,7 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, extra
     if (field.type === "file") return shell(<div><QuestionText field={field} id={labelId} />{helper}
       <FileFieldControl preview={preview} describedBy={describedBy} disabled={disabled} field={field} labelledBy={labelId} onChange={(next) => set(field.key, next)} registerRef={register(field.key)} templateId={templateId} value={answers[field.key]} />{errorText}
     </div>);
-    const dynamic = optionsFor(field.type, field); const staticOptions = field.options ?? [];
+    const dynamic = optionsFor(field.type); const staticOptions = field.options ?? [];
     const checkboxOptions = staticOptions.length ? staticOptions : dynamic.map((option) => ({ value: option.id, label: option.label }));
     // Multi-answer questions are a tappable list on every device: a native multi-select is unusable on Android.
     if ((field.type === "checkbox" && checkboxOptions.length) || field.type === "multiselect") {
@@ -330,19 +330,12 @@ export function FormRenderer({ definition, dynamicOptions = EMPTY_OPTIONS, extra
     </fieldset>);
 
     const selectOptions = dynamic.length ? dynamic : staticOptions.map((option) => ({ id: option.value, label: option.label }));
-    // A Users question with nobody to choose must say why, never show an empty list (owner report 2026-11-11).
-    const noPeople = field.type === "user_dropdown" && !readOnly && dynamic.length === 0
-      ? dynamicOptions.users.length === 0
-        ? "The people list did not load. Close this form and open it again."
-        : "No one you can see matches who this question allows. Ask a form admin to check the question's people filter."
-      : null;
     const onText = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => { const raw = event.target.value; set(field.key, NUMBER_TYPES.has(field.type) ? (raw === "" ? "" : Number(raw)) : raw); };
     const inputType = NUMBER_TYPES.has(field.type) ? "number" : field.type === "datetime" ? "datetime-local" : field.type === "phone" ? "tel" : field.type;
     const inputMode = field.type === "phone" ? "tel" : field.type === "email" ? "email" : NUMBER_TYPES.has(field.type) ? "decimal" : undefined;
     const textValue = typeof value === "string" || typeof value === "number" ? value : "";
     const control = field.type === "textarea" ? <textarea {...aria} className="field min-h-24" disabled={disabled} maxLength={field.validation?.maxLength} onChange={onText} placeholder={field.placeholder} ref={register(field.key)} rows={3} value={typeof value === "string" ? value : ""} />
       : SELECT_TYPES.has(field.type) ? <><select {...aria} className="field" disabled={disabled} onChange={(event) => { if (event.target.value === OTHER_CHOICE) { openOther(field.key, true); set(field.key, ""); } else chooseListed(event.target.value); }} ref={register(field.key)} value={otherChosen ? OTHER_CHOICE : typeof value === "string" ? value : ""}><option value="">Choose an answer</option>{selectOptions.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}{singleOther ? <option value={OTHER_CHOICE}>Other (type your answer)</option> : null}</select>
-        {noPeople ? <span className="mt-1.5 block text-sm font-medium text-danger" role="status">{noPeople}</span> : null}
         {otherChosen ? <OtherAnswerInput disabled={disabled} inputRef={otherFocusRef(field.key)} label={field.label} onChange={(text) => set(field.key, text)} value={otherText} /> : null}</>
       : field.type === "checkbox" ? <span className={OPTION_ROW}><input {...aria} checked={value === true} disabled={disabled} onChange={(event) => set(field.key, event.target.checked)} ref={register(field.key)} type="checkbox" /><span>{field.placeholder ?? "Yes"}</span></span>
       : field.type === "currency" ? <span className="relative block"><span aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-task-text-muted">₹</span><input {...aria} className="field pl-7" disabled={disabled} inputMode="decimal" onChange={onText} placeholder={field.placeholder} ref={register(field.key)} step="any" type="number" value={textValue} /></span>

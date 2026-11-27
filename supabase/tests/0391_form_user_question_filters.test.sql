@@ -1,5 +1,5 @@
 -- Filters on a Users question (0391): saved settings are validated, and a
--- submitted person who does not match is refused by the server.
+-- filters set the initial list; 0444 permits choosing another eligible employee.
 begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
@@ -95,13 +95,13 @@ select throws_ok($$select normalize_form_fields('[{"key":"p","label":"P","type":
 select ok(not has_function_privilege('authenticated', 'form_user_matches_filter(jsonb,uuid)', 'EXECUTE'), 'browsers cannot probe employee details through the matcher');
 
 -- ---------------------------------------------------------------------------
--- Submitting: the server refuses a person outside the question's filter
+-- Submitting: 0444 permits active people outside the initial filter
 -- ---------------------------------------------------------------------------
 set local role authenticated;
 select pg_temp.login('filler');
 select lives_ok(pg_temp.submit(jsonb_build_object('salesperson', pg_temp.p('sales_bandra'))), 'a Sales employee is accepted');
-select throws_ok(pg_temp.submit(jsonb_build_object('salesperson', pg_temp.p('crm_bandra'))), '23514', null, 'a CRM employee sent in a crafted request is refused');
-select throws_ok(pg_temp.submit(jsonb_build_object('salesperson', pg_temp.p('manager'))), '23514', null, 'all rules must match (manager role excluded)');
+select lives_ok(pg_temp.submit(jsonb_build_object('salesperson', pg_temp.p('crm_bandra'))), '0444: a person outside the initial department list is accepted');
+select lives_ok(pg_temp.submit(jsonb_build_object('salesperson', pg_temp.p('manager'))), '0444: the filter is the initial list, not an authority restriction');
 select lives_ok(pg_temp.submit(jsonb_build_object('either', pg_temp.p('sales_andheri'))), 'any rule: the Senior Sales designation matches');
 select lives_ok(pg_temp.submit(jsonb_build_object('either', pg_temp.p('crm_bandra'))), 'any rule: the Bandra store matches');
 select lives_ok(pg_temp.submit(jsonb_build_object('anyone', pg_temp.p('crm_bandra'))), 'an unfiltered Users question is unchanged');
