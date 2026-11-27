@@ -232,7 +232,8 @@ Deno.test("a sheet without the key column is refused with a short code", async (
   const reader: SheetReader = { rows: () => Promise.resolve([["Name", "Status"]]) };
   const fake = fakeGateway();
   const body = await (await handleSyncRequest(post(), deps([live(reader)], fake.gateway))).json();
-  assertEquals(body.sources[0].error, "key_column_missing");
+  assertEquals(body.sources[0].error, "key_column_missing:callId");
+  assertEquals(fake.errors, ["runo:key_column_missing:callId"]);
 });
 
 Deno.test("a row is identified by several columns when one is not unique", () => {
@@ -248,7 +249,7 @@ Deno.test("every key column must be in the header", async () => {
   const fake = fakeGateway();
   const source: SheetSource = { source: "runo_old", keyColumns: ["Unique id", "Interaction Date"], oneTime: true, reader };
   const response = await handleSyncRequest(post("s", OLD), deps([source], fake.gateway));
-  assertEquals((await response.json()).sources[0].error, "key_column_missing");
+  assertEquals((await response.json()).sources[0].error, "key_column_missing:Interaction Date");
 });
 
 Deno.test("headers below row 1: the header row is read and data starts under it", async () => {

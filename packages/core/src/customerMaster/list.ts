@@ -82,7 +82,11 @@ export type CustomerListFilterOptions = Readonly<{
   communities: readonly CustomerFilterValue[];
   first_sources: readonly CustomerFilterValue[];
   segments: Readonly<Partial<Record<CustomerSegment, number>>>;
-  import: readonly Readonly<{ source: string; last_run_at: string | null; rows_received: number; failed: boolean }>[];
+  import: readonly Readonly<{
+    source: string; last_run_at: string | null; rows_received: number; failed: boolean;
+    /** 0444; absent before that migration. */
+    label?: string; scheduled?: boolean; error?: string | null; error_since?: string | null; last_ok_at?: string | null; last_full_pass_at?: string | null;
+  }>[];
   /** Franchises the person may read (migration 0433); more than one only with company-wide authority. */
   franchises?: readonly Readonly<{ id: string; name: string }>[];
   /** The franchises the counts cover; null means all of them. */
