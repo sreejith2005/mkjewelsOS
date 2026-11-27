@@ -78,8 +78,11 @@ users, tasks, FMS, forms and the customer master database.
   `MKC-`/`MKF-`/`MKREF-` identifiers and search are kept.
 - Customer screens live in `apps/web/src/features/customers` and use the
   JewelOS design tokens like every other section.
-- Hosted staging is the free project `jewelos-staging` (synthetic data only).
-  Apply every migration there before production.
+- **One hosted project (owner decision 2026-11-27):** use only `jewelos-prod`
+  (`yimafxhuwgfhvzczqqdd`). There is no hosted staging requirement. Validate
+  changes locally with synthetic data, confirm the production ref and migration
+  ledger, and review the exact linked dry-run before an owner-authorized release.
+  Never seed or reset production.
 
 The Vite client may contain only `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`
 (the `VITE_CRM_*` settings went with the old CRM screens on 2026-11-20). An anon key is safe

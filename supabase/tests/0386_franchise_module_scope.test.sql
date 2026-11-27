@@ -207,19 +207,19 @@ select pg_temp.login('staff_bandra');
 select ok(list_assignment_locations(jsonb_build_object('kind','form','form_template_id',pg_temp.r('form'),'field_key','assign_to'))->'franchises' @> '[{"name":"Ahmedabad"}]',
   'the cross-location picker lists Ahmedabad');
 select is(jsonb_array_length(search_assignment_recipients(jsonb_build_object('kind','form','form_template_id',pg_temp.r('form'),'field_key','assign_to'),
-  pg_temp.b('AHD2'), '', 0, 20)->'rows'), 1, 'the picker lists eligible people in the chosen store (staff cannot assign managers, as today)');
+  pg_temp.b('AHD2'), '', 0, 20)->'rows'), 2, '0445: the form picker lists active staff and managers as Tasks does');
 select ok(not (search_assignment_recipients(jsonb_build_object('kind','form','form_template_id',pg_temp.r('form'),'field_key','assign_to'),
   pg_temp.b('AHD2'), 'staff', 0, 20)->'rows'->0 ? 'email'), 'the picker returns no email or phone');
-select throws_ok(format($$select list_assignment_locations(jsonb_build_object('kind','form','form_template_id',%L,'field_key','local_person'))$$, pg_temp.r('form')),
-  '42501', 'This question does not allow employees from other locations', 'a local question cannot open the cross-location picker');
+select lives_ok(format($$select list_assignment_locations(jsonb_build_object('kind','form','form_template_id',%L,'field_key','local_person'))$$, pg_temp.r('form')),
+  '0445: every Users question can open the store picker');
 select lives_ok(format($$select submit_form_with_audit(%L, jsonb_build_object('assign_to', %L), null, null)$$, pg_temp.r('form'), pg_temp.p('staff_ahd')),
   'G: Bandra staff assign an Ahmedabad employee through a cross-location question');
 reset role;
 select ok(pg_temp.p('staff_ahd') = any(org_cross_location_recipients()), 'the validated recipient is available to the work transition in the same transaction');
 set local role authenticated;
 select pg_temp.login('staff_bandra');
-select throws_ok(format($$select submit_form_with_audit(%L, jsonb_build_object('local_person', %L), null, null)$$, pg_temp.r('form'), pg_temp.p('mgr_ahd2')),
-  '42501', 'Field local_person names an employee outside your location', 'H: a forged answer on a local question is refused');
+select lives_ok(format($$select submit_form_with_audit(%L, jsonb_build_object('local_person', %L), null, null)$$, pg_temp.r('form'), pg_temp.p('mgr_ahd2')),
+  '0445: every Users question accepts another-store recipient');
 select lives_ok(format($$select submit_form_with_audit(%L, jsonb_build_object('local_person', %L), null, null)$$, pg_temp.r('form'), pg_temp.p('staff_andheri')),
   'a local question accepts a colleague in the same franchise');
 reset role;
@@ -227,15 +227,15 @@ select ok(exists (select 1 from audit_logs l join form_submissions s on s.id = l
   where l.action = 'cross_location_recipient_selected' and (l.new_value->>'recipient_id')::uuid = pg_temp.p('staff_ahd')
     and (l.new_value->>'origin_franchise_group_id')::uuid = pg_temp.r('MUM') and (l.new_value->>'recipient_franchise_group_id')::uuid = pg_temp.r('AHD')),
   'every cross-location selection is audited against its submission with both locations');
-select is((select count(*)::int from audit_logs where action = 'cross_location_recipient_selected'), 1, 'a same-franchise answer is not logged as cross-location');
+select is((select count(*)::int from audit_logs where action = 'cross_location_recipient_selected'), 2, 'both cross-franchise answers are audited; same-franchise answer adds no cross-location audit');
 insert into user_permission_overrides(user_profile_id, tenant_id, permission_key, effect)
 values (pg_temp.p('staff_andheri'), (select tenant_id from user_profiles where id = pg_temp.p('staff_andheri')), 'tasks.assign_cross_location', 'deny');
 set local role authenticated;
 select pg_temp.login('staff_andheri');
 select lives_ok(format($$select submit_form_with_audit(%L, jsonb_build_object('assign_to', %L), null, null)$$, pg_temp.r('form'), pg_temp.p('staff_ahd')),
   'the form builder setting alone allows other locations (owner decision 2026-11-06)');
-select throws_ok(format($$select submit_form_with_audit(%L, jsonb_build_object('local_person', %L), null, null)$$, pg_temp.r('form'), pg_temp.p('staff_ahd')),
-  '42501', null, 'a question without the setting still refuses another franchise''s employee');
+select lives_ok(format($$select submit_form_with_audit(%L, jsonb_build_object('local_person', %L), null, null)$$, pg_temp.r('form'), pg_temp.p('staff_ahd')),
+  '0445: store choices are available without the old setting');
 reset role;
 
 -- ===========================================================================

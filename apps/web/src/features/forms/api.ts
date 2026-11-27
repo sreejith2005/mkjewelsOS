@@ -127,6 +127,12 @@ export async function loadTaskForms(templateIds: string[], taskIds: string[]): P
   return { bundles: (templates.data ?? []).map((item) => ({ ...item, fields: toDefinition(item, fieldsByTemplate.get(item.id) ?? []).fields as FormFieldDefinition[], sections: parseSections(item.sections), submissionCount: counts.get(item.id) ?? 0 })), submissions: submissionRows };
 }
 type FormPersonRow = { id: string | null; employee_name: string | null; branch_id?: string | null; department_id?: string | null; designation_id?: string | null; user_role?: string | null };
+/** Only names and IDs authorized for this saved question; directory RLS stays intact. */
+export async function loadFormUserOptions(templateId: string, fieldKey: string, expanded: boolean, selectedUserId?: string): Promise<{ id: string; label: string }[]> {
+  const { data, error } = await supabase.rpc("list_form_user_options", { p_template_id: templateId, p_field_key: fieldKey, p_expanded: expanded, ...(selectedUserId ? { p_selected_user_id: selectedUserId } : {}) });
+  fail("Load form users", error);
+  return data ?? [];
+}
 /**
  * People for Users questions with what a question's filter reads (migration 0391).
  * Every column is required: a list missing a person's designation, store or role

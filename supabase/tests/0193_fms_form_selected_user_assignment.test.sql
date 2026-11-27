@@ -160,7 +160,7 @@ set local role authenticated;
 select throws_ok($$select submit_form_and_start_fms_with_audit(
   (select id from fms_assignment_fixture where name='form'),
   jsonb_build_object('assigned_to',(select id from fms_assignment_fixture where name='selected')))$$,
-  '23503','FMS user is not an active login-enabled tenant profile','invalid assigned user aborts the combined submission');
+  '23503','Field assigned_to references an invalid user','invalid assigned user aborts the combined submission before FMS handoff');
 reset role;
 select is((select count(*)::integer from form_submissions),(select n from fms_submission_count_before_failure),
   'a failed workflow start leaves no orphan form submission');
