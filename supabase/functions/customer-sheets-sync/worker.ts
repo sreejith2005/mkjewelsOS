@@ -258,7 +258,9 @@ export async function syncSheet(config: SheetSource & { reader: SheetReader }, g
   } else try {
     const header = await reader.rows(headerRow, headerRow);
     const names = headerNames(header[0] ?? []);
-    if (!keyColumns.every((column) => names.includes(column))) throw new Error("key_column_missing");
+    const missing = keyColumns.filter((column) => !names.includes(column));
+    // The column names (headers, not cell values) say which one to put back.
+    if (missing.length) throw new Error(`key_column_missing:${missing.join(", ")}`);
     const headers = names.filter(Boolean);
 
     // Some regions of a large sheet answer slowly. A read that times out is
@@ -453,11 +455,12 @@ export async function handleSyncRequest(request: Request, deps: SyncDeps): Promi
         maxChunks, scanChunks: maxChunks === 0 ? 0 : SCAN_CHUNKS, deadline, now, restart, scheduledOnly: !only,
       }));
     } catch (error) {
-      // Only a short code is stored or returned; never sheet content. An error
-      // without a code of its own is reported by its type, for example
-      // sync_failed_timeouterror, so the cause can be found without a log.
+      // Only a short code is stored or returned, optionally with a tab or
+      // column name after ":"; never sheet content. An error without a code of
+      // its own is reported by its type, for example sync_failed_timeouterror,
+      // so the cause can be found without a log.
       const kind = error instanceof Error ? error.name.toLowerCase().replace(/[^a-z0-9]/g, "") : "";
-      const code = error instanceof Error && /^[a-z_0-9]+$/.test(error.message) ? error.message : kind ? `sync_failed_${kind}` : "sync_failed";
+      const code = error instanceof Error && /^[a-z_0-9]+(:[^\r\n]{1,120})?$/.test(error.message) ? error.message : kind ? `sync_failed_${kind}` : "sync_failed";
       try { await deps.gateway.noteError(config.source, code); } catch { /* The response still reports the failure. */ }
       results.push({ source: config.source, rows_read: 0, new: 0, changed: 0, applied: 0, rejected: 0, pending: 0, removed: 0, reached_end: false, full_pass_done: false, error: code });
       failed = true;

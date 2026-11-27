@@ -77,7 +77,7 @@ export function googleSheetReader(keyJson: string, spreadsheetId: string, tab: s
         let message = "";
         try { message = String(((await response.json()) as { error?: { message?: unknown } }).error?.message ?? ""); } catch { /* keep "" */ }
         if (/exceeds grid limits/i.test(message)) return [];
-        if (/unable to parse range/i.test(message)) throw new Error("sheet_tab_not_found");
+        if (/unable to parse range/i.test(message)) throw new Error(`sheet_tab_not_found:${tab}`);
         throw new Error("sheet_range_refused");
       }
       // The HTTP status says why (429 too many requests, 500/503 Google could not
