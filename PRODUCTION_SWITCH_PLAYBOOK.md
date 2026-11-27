@@ -1,6 +1,6 @@
 # JewelOS production switch playbook
 
-Last source review: 2026-08-29 (Asia/Kolkata)
+Hosted-project decision updated: 2026-11-27 (Asia/Kolkata)
 
 This is the release procedure for the active JewelOS repository. It separates
 what source code is configured to do from what has actually been verified in a
@@ -66,11 +66,12 @@ build configuration, source, Git, or a user device.
 | Environment | Purpose | Supabase target | Data |
 | --- | --- | --- | --- |
 | Local | Build, destructive DB tests, synthetic development | Local CLI/Docker stack | Synthetic only |
-| Staging | Hosted release verification | Separate hosted project | Synthetic/masked only |
-| Production | Staff use | Hosted production project | Protected operational data |
+| Production | Staff use and owner-authorized releases | `jewelos-prod` (`yimafxhuwgfhvzczqqdd`) | Protected operational data |
 
-Do not use production as a feature-test database. A separate hosted staging
-project is a launch requirement, not a convenience.
+Owner decision 2026-11-27: `jewelos-prod` is the only hosted Supabase project;
+there is no hosted staging gate. Use local synthetic validation before an
+owner-authorized production release, and report authenticated production and
+device evidence separately. Never seed or reset production.
 
 ## 3. Local setup and verification
 
@@ -152,9 +153,10 @@ Treat matches as review prompts, not permission to print credentials. Never
 stage `.env`, `.supabase`, `supabase/.temp`, production exports, customer data,
 or key material. Record the release commit SHA after review.
 
-### Gate D - Staging deployment
+### Gate D - Hosted preflight
 
-Use an authenticated Supabase CLI session linked to **staging**. Before any
+Use an authenticated Supabase CLI session linked to **jewelos-prod**
+(`yimafxhuwgfhvzczqqdd`). Before any
 hosted command, establish the exact project in the interactive CLI/UI and
 record its non-secret name/reference. Do not paste access tokens or passwords
 into command lines.
@@ -186,8 +188,9 @@ must validate a dedicated server-side `x-cron-secret` before parsing a request
 or accessing data. Configure/rotate those secrets only through protected
 Supabase secret management; never call them from a browser.
 
-Build/deploy the web app with staging-only browser-safe Vite variables. Then
-smoke-test with controlled synthetic users:
+Build/deploy the web app with the confirmed project's browser-safe Vite
+variables. Validate these flows locally with synthetic users, then perform
+only owner-authorized production smoke checks:
 
 - sign-in, password recovery, logout, inactive-account denial, and redirects;
 - role/RLS success and denial paths; audit records for changed workflows;
@@ -198,8 +201,8 @@ smoke-test with controlled synthetic users:
 - desktop and mobile-width route rendering, console/network errors, and
   monitoring signals.
 
-If staging fails, fix source and repeat from the applicable local gate. Do not
-use production as a shortcut around a failed/unverified staging gate.
+If local validation or hosted preflight fails, fix source and repeat the
+applicable gate before production writes.
 
 ### Gate E - Production release
 
@@ -247,7 +250,7 @@ corrected by a reviewed forward migration, not by changing history.
    it the worker answers 503 and the Tasks composer stays fully usable by hand.
    The function keeps the default `verify_jwt`; do not add it to the
    `verify_jwt = false` list in `supabase/config.toml`.
-7. Vercel must retain HTTPS, separate staging/production environments, SPA
+7. Vercel must retain HTTPS, the confirmed production environment, SPA
    fallback, deployment logs/commit association, browser-safe variables only,
    and rollback to a known-good deployment. Deploy `apps/web/dist`, never the
    Vite dev server.
@@ -269,17 +272,17 @@ corrected by a reviewed forward migration, not by changing history.
 - [ ] Clean local reset, relevant pgTAP, lint, core/web tests, typecheck and build pass.
 - [ ] Rendered desktop and narrow-width web QA passes.
 - [ ] Authenticated role-based E2E covers critical work flows.
-- [ ] Staging smoke tests pass with evidence attached to the release record.
+- [ ] Local synthetic smoke tests pass; hosted evidence is recorded separately.
 - [ ] Loading, error/recovery, accessibility, and provider failure states are reviewed.
 - [ ] Mobile is separately device-tested and signed before any mobile launch claim.
 
 ### Operations
 
-- [ ] Separate staging and production Supabase projects are configured.
-- [ ] Vercel staging/production host, HTTPS, deep links, variables and rollback are verified.
+- [ ] The sole hosted Supabase target is confirmed as `jewelos-prod` (`yimafxhuwgfhvzczqqdd`).
+- [ ] Vercel production host, HTTPS, deep links, variables and rollback are verified.
 - [ ] Named functions, protected secrets, and cron schedules are deployed/verified.
 - [ ] Monitoring/alerts cover web, functions, cron, queues, exports and providers.
-- [ ] Backup/restore owner and a staging restore drill are documented.
+- [ ] Backup/restore owner and the recovery procedure are documented.
 - [ ] CI runs typecheck, tests, build, migration review, and secret scanning.
 
 ## 7. Rollback and incident response
@@ -300,7 +303,7 @@ before the next release.
 ```text
 Release: <name>
 Commit SHA: <sha>
-Target: staging | production
+Target: local validation | production
 Approved by: <name/role>
 Hosted project confirmed: <non-secret project name/reference>
 
