@@ -9,3 +9,5 @@ All Users questions support another store; retire the builder's contradictory op
 Approach: extend existing form and assignment contracts. A client-only directory/filter fix cannot solve hidden colleagues or submission rejection. A second assignment system would duplicate the existing store picker and handoff auditing.
 
 Plan: first reproduce the default and expanded list behavior in UI/SQL tests; add the scoped lookup and matching submit eligibility; wire a focused Users control; update help; run database, UI, type/build and responsive checks. Stage and release only these paths after checking staging and production ledgers.
+
+Production investigation found the reported empty question has Department=Sales AND Department=CRM. Migration 0445 corrects only published two-rule filters with precisely those department alternatives into a single Department Is in rule, with an audit record and no change to IDs, answers or other validation. New Department rules start with Is in and explain multi-department selection. Other All/Any semantics stay unchanged. The owner's 2026-11-27 single-hosted-project decision supersedes the former staging gate.

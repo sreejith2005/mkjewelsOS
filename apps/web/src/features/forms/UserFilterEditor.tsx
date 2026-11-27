@@ -45,7 +45,7 @@ export function UserFilterEditor({ value, options, onChange }: { value: FormUser
   return <details className="rounded-lg border border-gold/15 bg-obsidian/30 p-3 sm:col-span-2" open={!!value}>
     <summary className="cursor-pointer text-sm font-semibold text-champagne">Who can be chosen{value ? ` (${filter.rules.length} rule${filter.rules.length === 1 ? "" : "s"})` : ": everyone"}</summary>
     <div className="mt-3 space-y-3">
-      <p className="text-xs text-soft-grey">Set the initial list of active employees, for example Department is equal to Sales. People filling the form can also choose someone outside the department or at another store.</p>
+      <p className="text-xs text-soft-grey">Set the initial list of active employees. To include Sales and CRM together, use one Department Is in rule and select both. People filling the form can also choose someone outside the department or at another store.</p>
       {filter.rules.length > 1 ? <label className="block text-sm text-champagne">People must match
         <select aria-label="People must match" className="field mt-1" onChange={(event) => set(filter.rules, event.target.value === "any" ? "any" : "all")} value={filter.match}>
           <option value="all">All rules (AND)</option><option value="any">Any rule (OR)</option>
@@ -56,7 +56,7 @@ export function UserFilterEditor({ value, options, onChange }: { value: FormUser
           <legend className="sr-only">Rule {index + 1}</legend>
           <select aria-label={`Rule ${index + 1} field`} className="field" onChange={(event) => {
             const attribute = event.target.value as FormUserFilterAttribute;
-            update(index, { attribute, operator: formUserFilterOperators(attribute)[0]!, values: [] });
+            update(index, { attribute, operator: attribute === "department" ? "in" : formUserFilterOperators(attribute)[0]!, values: [] });
           }} value={rule.attribute}>{FORM_USER_FILTER_ATTRIBUTES.map((attribute) => <option key={attribute} value={attribute}>{FORM_USER_FILTER_LABELS[attribute]}</option>)}</select>
           <select aria-label={`Rule ${index + 1} condition`} className="field" onChange={(event) => {
             const operator = event.target.value as FormUserFilterOperator;
@@ -74,7 +74,7 @@ export function UserFilterEditor({ value, options, onChange }: { value: FormUser
         </fieldset>;
       })}
       <div className="flex flex-wrap items-center gap-3">
-        <Button onClick={() => set([...filter.rules, { attribute: "department", operator: "equals", values: [] }])} type="button" variant="secondary"><Plus className="size-4" />Add rule</Button>
+        <Button onClick={() => set([...filter.rules, { attribute: "department", operator: "in", values: [] }])} type="button" variant="secondary"><Plus className="size-4" />Add rule</Button>
         {value ? <span className="text-xs text-soft-grey">{matching} of {options.users.length} people you can see match.</span> : null}
       </div>
       {problem ? <p className="text-xs text-danger" role="alert">{problem}</p> : null}

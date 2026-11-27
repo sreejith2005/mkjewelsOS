@@ -87,4 +87,44 @@ select pg_temp.patch_form_users('public.fms_assignment_user_from_submission(uuid
   end if;
 $o$, '');
 
+-- department-alternatives-repair:begin
+-- The reported blank question saved Department=Sales AND Department=CRM.
+-- Repair only that impossible two-rule configuration to the requested union.
+-- Preserve every other rule configuration, validation setting, ID and answer.
+do $repair$
+declare r record; v_rules jsonb; v_filter jsonb; v_validation jsonb;
+  previous_edit_flag text := coalesce(current_setting('jewelos.allow_published_form_edit',true),'');
+begin
+  for r in
+    select f.id,f.form_template_id,f.field_key,f.validation,t.tenant_id
+    from form_fields f join form_templates t on t.id=f.form_template_id
+    where f.field_type='user_dropdown' and t.lifecycle='published'
+      and coalesce(f.validation->'userFilter'->>'match','all')='all'
+      and jsonb_array_length(coalesce(f.validation->'userFilter'->'rules','[]'::jsonb))=2
+      and (select count(*) from jsonb_array_elements(f.validation->'userFilter'->'rules') rule
+           join departments d on d.id::text=lower(rule->'values'->>0) and d.tenant_id=t.tenant_id
+           where rule->>'attribute'='department' and rule->>'operator'='equals'
+             and jsonb_array_length(rule->'values')=1 and lower(btrim(d.name)) in ('sales','crm'))=2
+      and (select count(distinct lower(btrim(d.name)))
+           from jsonb_array_elements(f.validation->'userFilter'->'rules') rule
+           join departments d on d.id::text=lower(rule->'values'->>0) and d.tenant_id=t.tenant_id)=2
+    for update of f
+  loop
+    select jsonb_build_array(jsonb_build_object('attribute','department','operator','in',
+      'values',jsonb_agg(rule->'values'->0 order by ord))) into v_rules
+      from jsonb_array_elements(r.validation->'userFilter'->'rules') with ordinality x(rule,ord);
+    v_filter:=jsonb_set(r.validation->'userFilter','{rules}',v_rules);
+    v_validation:=jsonb_set(r.validation,'{userFilter}',v_filter);
+    perform set_config('jewelos.allow_published_form_edit','on',true);
+    update form_fields set validation=v_validation where id=r.id;
+    perform set_config('jewelos.allow_published_form_edit',previous_edit_flag,true);
+    insert into audit_logs(tenant_id,actor_user_id,action,module,record_id,old_value,new_value)
+    values(r.tenant_id,null,'form_department_choices_corrected','forms',r.id,
+      jsonb_build_object('validation',r.validation),
+      jsonb_build_object('form_template_id',r.form_template_id,'field_key',r.field_key,
+        'validation',v_validation,'reason','Owner requested Sales or CRM as alternative departments'));
+  end loop;
+end $repair$;
+-- department-alternatives-repair:end
+
 notify pgrst,'reload schema';
