@@ -1,5 +1,5 @@
 import { getSupabase as db } from "@jewelos/api-client/client";
-import { customerListFilterPayload, type CustomerListFilterOptions, type CustomerListFilters, type CustomerListPage } from "@jewelos/core";
+import { customerListFilterPayload, type CustomerCallLog, type CustomerListFilterOptions, type CustomerListFilters, type CustomerListPage } from "@jewelos/core";
 
 /** One contact on a customer's timeline (public.customer_get_timeline). */
 export type CustomerTimelineEntry = Readonly<{
@@ -21,6 +21,10 @@ export type CustomerTimelineEntry = Readonly<{
   products: readonly Readonly<{ code: string | null; category: string | null; interest: string }>[];
   follow_ups: readonly Readonly<{ code: string; kind: string; due_at: string; status: string }>[];
   appointments: readonly Readonly<{ code: string; type: string; scheduled_at: string; status: string }>[];
+  /** Migration 0446: the Runo call log of this call, whether an interaction form was filled, and the sheets it is in. */
+  call?: CustomerCallLog | null;
+  has_interaction_form?: boolean;
+  sheets?: readonly string[];
 }>;
 
 /** The identity card of one customer (public.customer_get_profile). */
@@ -109,7 +113,11 @@ export type CustomerInteractionPage = Readonly<{
     assigned_by: string | null; attended_by: string | null; branch: string | null; store_as_written: string | null;
     contact_role: string | null; customer_type_stated: string | null; process_name: string | null; fms_stage: string | null;
     external_ref: string | null; created_at: string; updated_at: string; archived: boolean; archive_reason: string | null;
+    /** Migration 0446. */
+    call?: CustomerCallLog | null; has_interaction_form?: boolean; sheets?: readonly string[];
   }>;
+  /** Migration 0446: the same call's rows in other sheets. */
+  other_sheet_rows?: readonly Readonly<{ source: string; label: string; sheet_row: number | null; status: string }>[];
   client: Readonly<{ client_id: string; client_code: string; name: string | null; phone: string | null; city: string | null }>;
   products: readonly Readonly<{ code: string | null; category: string | null; interest: string }>[];
   follow_ups_created: readonly Readonly<{ code: string; kind: string; due_at: string; status: string; reason: string | null; assigned_to: string | null; closed_by_interaction_code: string | null }>[];

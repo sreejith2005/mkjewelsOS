@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { Button, Notice } from "@/components/ui";
 import { errorMessage, titleCase } from "@/lib/format";
-import { formatPhone } from "@jewelos/core";
+import { callDurationLabel, callPartsLabel, formatPhone } from "@jewelos/core";
 import { loadCustomerInteractionPage, type CustomerInteractionPage } from "./api";
 import { CodeLink, Fact, Section } from "./CustomerProfileView";
 import { appointmentLabel, channelLabel, followUpLabel, formatDate, formatDateTime, RESULT_LABEL, RESULT_TONE } from "./format";
@@ -48,6 +48,14 @@ export function CustomerInteractionView({ interactionCode, onBack, onOpenClient,
     ["Process", item.process_name],
     ["Stage", item.fms_stage],
     ["Source", item.source_label ?? titleCase(item.source)],
+    ["Call", callPartsLabel(item)],
+    ["Call started", item.call?.started_at ? formatDateTime(item.call.started_at) : null],
+    ["Call length", callDurationLabel(item.call?.duration_seconds)],
+    ["Call type", item.call?.type ?? null],
+    ["Call tag", item.call?.tag ?? null],
+    ["Call status", item.call?.status ?? null],
+    ["Caller", item.call?.caller ?? null],
+    ["In sheets", item.sheets && item.sheets.length ? item.sheets.join(", ") : null],
     ["Recorded", formatDateTime(item.created_at)],
     ["Last changed", item.updated_at !== item.created_at ? formatDateTime(item.updated_at) : null],
   ];
@@ -116,6 +124,11 @@ export function CustomerInteractionView({ interactionCode, onBack, onOpenClient,
               <p className="mb-1 pt-3 text-sm text-task-text-muted">
                 {data.sheet_row.label ?? titleCase(data.sheet_row.source)}{data.sheet_row.sheet_row ? `, row ${data.sheet_row.sheet_row}` : ""} · {titleCase(data.sheet_row.status)} · First read {formatDateTime(data.sheet_row.first_seen_at)}
               </p>
+              {data.other_sheet_rows && data.other_sheet_rows.length ? (
+                <p className="mb-1 text-sm text-task-text-muted">
+                  Same call also in: {data.other_sheet_rows.map((row) => `${row.label}${row.sheet_row ? `, row ${row.sheet_row}` : ""}`).join("; ")}
+                </p>
+              ) : null}
               <dl className="divide-y divide-dashed divide-task-border">
                 {shown.map((column) => (
                   <div className="grid grid-cols-1 gap-x-4 py-2 sm:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]" key={column.header}>

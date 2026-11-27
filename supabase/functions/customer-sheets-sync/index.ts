@@ -49,6 +49,11 @@ function gateway(url: string, key: string): IngestGateway {
 // its tab, the columns that together identify a row, and whether it is read only once.
 const SHEETS = [
   { source: "runo", idSecret: "RUNO_SHEET_ID", tabSecret: "RUNO_SHEET_TAB", tab: "Interactions", keyColumns: ["callId"], oneTime: false },
+  // Migration 0446: the new live sheet "LIVE RUNO 26-11-2026" (INTERACTION and CALL LOG tabs), and the
+  // old sheet's "Call logs" tab. The same callId in any of them is one call.
+  { source: "runo_live", idSecret: "RUNO_LIVE_SHEET_ID", tabSecret: "RUNO_LIVE_INTERACTION_TAB", tab: "INTERACTION", keyColumns: ["callId"], oneTime: false },
+  { source: "runo_call_log", idSecret: "RUNO_LIVE_SHEET_ID", tabSecret: "RUNO_LIVE_CALL_LOG_TAB", tab: "CALL LOG", keyColumns: ["callId"], oneTime: false },
+  { source: "runo_call_log_old", idSecret: "RUNO_SHEET_ID", tabSecret: "RUNO_CALL_LOGS_TAB", tab: "Call logs", keyColumns: ["callId"], oneTime: false },
   { source: "runo_old", idSecret: "RUNO_OLD_SHEET_ID", tabSecret: "RUNO_OLD_SHEET_TAB", tab: "25-26", keyColumns: ["Unique id", "Interaction Date"], oneTime: true },
   // "ALL FMS MASTER DATABASE": row 1 holds column numbers, the headers are on row 2.
   // COMBO (reference number + stage) is unique per row.
@@ -106,6 +111,7 @@ const SHEETS = [
 const PROBE_FILES: Record<string, string> = {
   runo: "RUNO_SHEET_ID",
   runo_old: "RUNO_OLD_SHEET_ID",
+  runo_live: "RUNO_LIVE_SHEET_ID",
   fms: "FMS_SHEET_ID",
   walkin: "WALKIN_SHEET_ID",
   exhibition: "EXHIBITION_SHEET_ID",

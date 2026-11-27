@@ -3,7 +3,7 @@ import { ArrowLeft, CalendarClock, MessageCircle, Phone } from "lucide-react";
 import { Button, Notice } from "@/components/ui";
 import { errorMessage, titleCase } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { CUSTOMER_STAGE_LABELS, daysAgoLabel, formatPhone, type CustomerLifecycleStage } from "@jewelos/core";
+import { callPartsLabel, callSummary, CUSTOMER_STAGE_LABELS, daysAgoLabel, formatPhone, type CustomerLifecycleStage } from "@jewelos/core";
 import { loadCustomerClientPage, loadCustomerTimeline, type CustomerAnswer, type CustomerClientPage, type CustomerTimelineEntry } from "./api";
 import { appointmentLabel, channelLabel, followUpLabel, formatDate, formatDateTime, formatProfileDate, RESULT_LABEL, RESULT_TONE } from "./format";
 import { InfoCard, InfoRow, Tags, type EarlierValue } from "./parts";
@@ -118,8 +118,15 @@ export function TimelineEntry({ entry, onOpen }: { entry: CustomerTimelineEntry;
           {entry.outcome ?? (entry.successful ? "Reached" : "Not reached")}{entry.non_contact_reason ? ` (${entry.non_contact_reason})` : ""}
         </span>
         <span className="mt-0.5 block text-sm text-task-text-muted">{channelLabel(entry.channel)}{who ? `, ${who}` : ""}</span>
+        {callPartsLabel(entry) ? (
+          <span className="mt-1 block text-sm text-task-text-muted">
+            <span className="mr-2 rounded-full border border-task-border px-2 py-0.5 text-xs font-semibold text-task-text">{callPartsLabel(entry)}</span>
+            {callSummary(entry.call)}
+          </span>
+        ) : null}
         {entry.notes ? <span className="mt-2 block whitespace-pre-wrap break-words rounded-lg bg-task-muted p-2 text-sm text-task-text">{entry.notes}</span> : null}
         {led.length > 0 ? <span className="mt-2 block text-sm text-task-text-muted">Led to: {led.join(", ")}</span> : null}
+        {entry.sheets && entry.sheets.length > 1 ? <span className="mt-1 block text-xs text-task-text-muted">In {entry.sheets.length} sheets: {entry.sheets.join(", ")}</span> : null}
       </button>
     </li>
   );
