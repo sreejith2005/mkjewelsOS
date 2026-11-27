@@ -29,9 +29,9 @@ vi.mock("@jewelos/data", () => {
     fetchToday: vi.fn(), fetchConversationPage: vi.fn(), fetchConversationCard: vi.fn(), fetchAnalysisSnapshot: vi.fn(), fetchActionTasks: vi.fn(async () => []),
     createActionTask: vi.fn(async () => ({ taskId: "t1", alreadyCreated: false })), fetchEvidenceAudio: vi.fn(async () => ({ url: "blob:clip", clipStartMs: 58000 })),
     reviewAnalysis: vi.fn(), requestRescore: vi.fn(async () => ({ alreadyRequested: false })), requestReprocess: vi.fn(), correctTranscript: vi.fn(),
-    recordingSnapshot: vi.fn(async () => ({ session: {}, segments: [], alerts: [] })), recordingWalkins: vi.fn(async () => []), linkRecordingWalkin: vi.fn(),
+    recordingSnapshot: vi.fn(async () => ({ session: {}, segments: [], alerts: [] })), linkRecordingWalkin: vi.fn(),
     fetchWorkspaceSettings: vi.fn(async () => ({ config: { employees: [] } })), fetchInsights: vi.fn(), fetchCoachingLists: vi.fn(), fetchDevices: vi.fn(),
-    fetchConversationIntegration: vi.fn(), linkCrmCustomer: vi.fn(async () => ({ linkId: "l1", alreadyLinked: false })), unlinkCrmCustomer: vi.fn(), retryCrmSync: vi.fn(),
+    fetchConversationIntegration: vi.fn(),
     createFollowUp: vi.fn(async () => ({ followUpId: "f1", taskId: "t1", fmsInstanceId: null, fmsReference: null, alreadyCreated: false })),
     fetchFollowUpOptions: vi.fn(async () => ({ owners: [{ id: "me", name: "Asha", is_salesperson: true }], supervisors: [], flows: [], default_due: null })),
   };

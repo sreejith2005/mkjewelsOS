@@ -127,7 +127,7 @@ select ok(not (get_dashboard_metrics('{"preset":"today"}')->'metrics' ? 'crm_cli
 select is((get_dashboard_metrics('{"preset":"today"}')->'metrics'->>'tasks_assigned')::int,0,'HR operational tasks remain personal rather than branch-wide');
 
 select set_config('request.jwt.claim.sub','ad130000-0000-0000-0000-000000000005',true);
-select lives_ok($$select get_report_data('crm_clients_ownership','{"preset":"today"}')$$,'CRM can open authorized CRM report');
+select throws_ok($$select get_report_data('crm_clients_ownership','{"preset":"today"}')$$,'22023','Unknown report key','the retired CRM report is refused (0443)');
 select throws_ok($$select get_report_data('people_availability','{"preset":"today"}')$$,'42501',null,'CRM cannot open people report');
 select is((get_report_data('task_operations','{"preset":"today","page":1,"page_size":25}')->>'total')::int,1,'CRM operational task report is personally scoped');
 

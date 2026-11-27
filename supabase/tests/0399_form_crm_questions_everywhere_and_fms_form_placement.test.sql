@@ -127,10 +127,6 @@ select throws_ok(format('select submit_form_with_audit(%L,%L::jsonb)',pg_temp.v(
   '23503', null, 'another person''s upload is refused');
 reset role;
 
--- Customer Integration keeps both types operational (never copied into a CRM client detail).
-select ok(position($$'file','repeat','crm_photo'))$$ in pg_get_functiondef('crm_sync.save_customer_mapping(uuid,jsonb,uuid)'::regprocedure))>0,
-  'a repeating group or photo question cannot fill a CRM client detail');
-
 -- 3. FMS workflow forms placement ----------------------------------------------------------
 insert into r select 'family', to_jsonb(family_id) from form_templates where id=pg_temp.v('form')::uuid;
 do $$

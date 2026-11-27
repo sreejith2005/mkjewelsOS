@@ -94,14 +94,7 @@ select pg_temp.ract('inactive');
 select throws_ok($$select recorder_session_snapshot(pg_temp.rid('session'))$$,'42501','recorder_actor_denied','inactive actor denied');
 
 select pg_temp.ract('owner');
-select is(jsonb_array_length(recorder_linkable_walkins()),0,'no unverified customer choices');
-select throws_ok($$select recorder_link_customer(pg_temp.rid('session'),'customer:unverified')$$,'0A000','recorder_crm_verification_unavailable','unverified CRM customer blocked');
-select throws_ok($$select recorder_link_customer(pg_temp.rid('session'),'walkin:00000000-0000-0000-0000-000000000000')$$,'42501','recorder_link_denied','fabricated walk-in blocked');
-insert into rf values('queue',gen_random_uuid(),null);
-with task as (insert into task_instances(tenant_id,branch_id,task_type,title,planned_datetime,source,source_ref_id,created_by) values(pg_temp.rid('tenant'),pg_temp.rid('branch'),'delegation','Synthetic walk-in',now(),'crm_walkin',pg_temp.rid('queue'),pg_temp.rid('owner')) returning id)
-insert into crm_sync.walkin_state(queue_id,snapshot_at,outcome,task_id) select pg_temp.rid('queue'),now(),'created',id from task;
-select is(jsonb_array_length(recorder_linkable_walkins()),1,'only audited synced walk-in offered');
-select is(recorder_link_customer(pg_temp.rid('session'),'walkin:'||pg_temp.rid('queue'))->>'customer_ref','walkin:'||pg_temp.rid('queue'),'verified walk-in link persisted');
+select ok(to_regprocedure('recorder_link_customer(uuid,text)') is null and to_regprocedure('recorder_linkable_walkins()') is null,'linking a CRM walk-in was removed with the old CRM (0443)');
 select pg_temp.ract('manager');
 update user_profiles set branch_id=pg_temp.rid('branch2') where id=pg_temp.rid('manager');
 select throws_ok($$select recorder_session_snapshot(pg_temp.rid('session'))$$,'42501','recorder_session_denied','cross branch manager denied');

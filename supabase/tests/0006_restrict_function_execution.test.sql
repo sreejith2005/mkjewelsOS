@@ -170,18 +170,7 @@ select is((
       'retry_notification_delivery(uuid)',
       'get_notification_provider_availability()',
       'list_notification_delivery_logs(text,text,text,text,timestamp with time zone,timestamp with time zone,integer,integer)',
-      'normalize_indian_phone(text)', 'assert_crm_actor()', 'can_read_crm_client(uuid)',
-      'lookup_crm_client_by_phone(text)', 'search_crm_clients(jsonb)', 'get_crm_client_detail(uuid)', 'list_crm_followups(jsonb)',
-      'create_crm_client(jsonb,uuid)', 'update_crm_client(uuid,jsonb,integer,uuid)',
-      'reassign_crm_client(uuid,uuid,uuid,integer,uuid)', 'record_crm_walkin(jsonb,uuid)',
-      'merge_crm_clients(uuid,uuid,uuid)', 'log_crm_interaction(uuid,jsonb,uuid)',
-      'correct_crm_interaction(uuid,jsonb,uuid)', 'create_crm_followup(uuid,jsonb,uuid)',
-      'reschedule_crm_followup(uuid,date,uuid,text,integer,uuid)',
-      'complete_crm_followup(uuid,text,integer,uuid)', 'cancel_crm_followup(uuid,text,integer,uuid)',
-      'register_crm_document(uuid,text,uuid,text,text,text,bigint,uuid)',
-      'remove_crm_document(uuid,text,uuid)', 'get_crm_document_path(uuid)', 'link_crm_record(uuid,text,uuid,uuid)',
-      'can_write_crm_document_object(text)', 'can_read_crm_document_object(text)',
-      'can_delete_crm_document_object(text)',
+      'normalize_indian_phone(text)',
       'get_home_summary(jsonb)', 'get_dashboard_metrics(jsonb)', 'get_report_data(text,jsonb)',
       'request_report_export_with_audit(text,jsonb,uuid)',
       'cancel_report_export_with_audit(uuid,uuid)', 'retry_report_export_with_audit(uuid,uuid)',
@@ -220,7 +209,6 @@ select is((
   'answer_kiara_escalation_with_audit(uuid,text,boolean,text)',
   -- 0213: Ask Kiara conversation and quota RPCs (caller-scoped, audited writes).
   'archive_my_kiara_conversation(uuid)',
-  'assert_crm_branch_user(uuid,uuid,uuid,text)',
   'assert_fms_flow_publishable(uuid)',
   'assign_imported_task_with_audit(text,uuid,uuid)',
   'begin_task_bulk_import(text,text,integer)',
@@ -234,13 +222,10 @@ select is((
   'complete_uploaded_task_with_audit(uuid,text)',
   -- 0230: Ask Kiara voice questions spend the shared hourly voice allowance as the caller.
   'consume_my_voice_quota()',
-  'create_crm_field_definition(text,text,text,text,jsonb,boolean,jsonb)',
   'create_dropdown_list_with_audit(text,jsonb)',
   'create_kiara_document_with_audit(text,text,text,text,integer,text,text[])',
   'create_kiara_escalation(uuid)',
   'create_manual_task_with_mode_with_audit(jsonb,uuid[],uuid[],jsonb)',
-  -- 0196: admin-only CRM sync health (counts only).
-  'crm_sync_health()',
   -- 0206/0207 (main): management insights reads and audited dashboard saved views.
   'delete_dashboard_view_with_audit(uuid,integer)',
   'delete_fms_flow_with_audit(uuid,text)',
@@ -339,8 +324,6 @@ select is((
   'task_effective_due_datetime(task_instances)',
   'task_feed_page(text,text,integer,integer)',
   'update_kiara_document_details_with_audit(uuid,text,text,text,text[])',
-  'upsert_crm_branch_mapping(text,text,uuid,jsonb)',
-  'upsert_crm_staff_mapping(text,text,uuid,jsonb)',
   'validate_task_bulk_import(jsonb,text)',
   'verify_recurring_task_with_audit(uuid,text,text)',
   'withdraw_my_kiara_escalation(uuid)'
@@ -353,7 +336,6 @@ select ok(has_function_privilege('service_role', 'process_notification_events(in
 select ok(has_function_privilege('service_role', 'claim_notification_deliveries(integer,uuid,integer)', 'EXECUTE'), 'service_role claims notification deliveries');
 select ok(has_function_privilege('service_role', 'finish_notification_delivery(uuid,text,text,text,boolean)', 'EXECUTE'), 'service_role finishes notification deliveries');
 select ok(has_function_privilege('service_role', 'detect_scheduled_notification_events(integer,timestamp with time zone)', 'EXECUTE'), 'service_role detects scheduled notification events');
-select ok(has_function_privilege('service_role', 'detect_crm_followup_events(integer,timestamp with time zone)', 'EXECUTE'), 'service_role detects CRM follow-up events');
 select ok(has_function_privilege('service_role', 'claim_report_exports(integer,uuid,integer)', 'EXECUTE'), 'service_role claims report exports');
 select ok(has_function_privilege('service_role', 'get_report_export_batch(uuid,integer,integer)', 'EXECUTE'), 'service_role reads bounded export batches');
 select ok(has_function_privilege('service_role', 'update_report_export_progress(uuid,uuid,integer,integer)', 'EXECUTE'), 'service_role updates export progress');
@@ -373,8 +355,7 @@ select is((
       'process_notification_events(integer)',
       'claim_notification_deliveries(integer,uuid,integer)',
       'finish_notification_delivery(uuid,text,text,text,boolean)',
-      'detect_scheduled_notification_events(integer,timestamp with time zone)',
-      'detect_crm_followup_events(integer,timestamp with time zone)'
+      'detect_scheduled_notification_events(integer,timestamp with time zone)'
       ,'claim_report_exports(integer,uuid,integer)'
       ,'get_report_export_batch(uuid,integer,integer)'
       ,'update_report_export_progress(uuid,uuid,integer,integer)'
@@ -390,7 +371,6 @@ select is((
   'apply_work_identity_with_audit(jsonb)',
   'audit_super_admin_password_reset(uuid,uuid)',
   'authorize_super_admin_password_reset(uuid,uuid)',
-  'begin_crm_sync_run(text,text,uuid,jsonb)',
   'bootstrap_initial_production_super_admin(uuid)',
   'claim_kiara_insight_work(uuid,text,integer,integer)',
   'complete_kiara_insight_batch(uuid,jsonb,text)',
@@ -399,27 +379,14 @@ select is((
   'consume_voice_interpretation_quota(uuid)',
   'create_recurring_todo_instance(uuid,date,uuid[])',
   'create_user_profile_with_coverage_and_audit(uuid,uuid,text,text,text,text,uuid,uuid,uuid,text,text,text[],user_role,uuid,uuid,uuid)',
-  -- 0195/0196: CRM sync workers (crm-staff-sync, crm-sync-receive).
-  'crm_sync_apply_walkin(text,jsonb)',
-  'crm_sync_claim_staff_events(integer)',
-  'crm_sync_finish_staff_event(bigint,boolean,text)',
-  'crm_sync_staff_roster()',
   'demo_data_purge_counts(uuid)',
-  'enrich_legacy_crm_timeline_visit_form(text,text,jsonb,text)',
   'execute_production_demo_data_retirement(uuid,uuid,text,text)',
-  'fail_crm_sync_run(uuid,text,uuid,jsonb)',
   'fail_kiara_insight_batch(uuid,text)',
-  'finalize_crm_sync_run(uuid,jsonb,uuid,jsonb)',
-  'get_crm_sync_checkpoint(text,text,jsonb)',
-  'import_legacy_crm_client(text,text,jsonb,text,uuid)',
-  'import_legacy_crm_timeline(text,text,text,jsonb,text,uuid)',
-  'ingest_crm_source_batch(uuid,text,text,jsonb,uuid,jsonb)',
   'invite_profile_with_audit_v2(uuid,uuid,text,text,uuid,uuid,uuid,text,text,text[],user_role,uuid)',
   'invite_profile_with_audit_v3(uuid,uuid,text,text,text,text,uuid,uuid,uuid,text,text,text[],user_role,uuid)',
   'kiara_insight_inputs(uuid[])',
   'list_open_kiara_insight_batches()',
   'mark_kiara_insight_batch_submitted(uuid,text)',
-  'preserve_legacy_crm_timeline_visit_form(text,text,jsonb,text)',
   'preview_production_demo_data_retirement(uuid,text,boolean)',
   'purge_demo_data(uuid,text[],text)',
   'reconcile_duplicate_production_identity_profiles()',

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { RecordingSession } from "@jewelos/core";
-import { controlRecordingSession, linkRecordingWalkin, listRecordingSessions, recordingSnapshot, renewRecordingTicket, startRecordingSession } from "@jewelos/data";
+import { controlRecordingSession, listRecordingSessions, recordingSnapshot, renewRecordingTicket, startRecordingSession } from "@jewelos/data";
 import { browserRecorder, webCaptureSupported } from "./browserRecorder";
 import { isJewelOSWebShell, nativeRecorderAvailable, sendNativeRecorder, useNativeCapture } from "./nativeCapture";
 
@@ -9,7 +9,7 @@ export type RecorderControl = Readonly<{
   state: RecorderState; elapsedMs: number; level: number; queuedBytes: number; network: string; captureError: string | null;
   activeId: string | null; isNative: boolean; inAppWithoutNative: boolean; supported: boolean; canControl: boolean; busy: boolean; error: string | null;
   linkNotice: string | null;
-  start: (walkinRef?: string) => Promise<string | null>; control: (action: "pause" | "resume" | "stop") => Promise<void>; retry: () => Promise<void>;
+  start: () => Promise<string | null>; control: (action: "pause" | "resume" | "stop") => Promise<void>; retry: () => Promise<void>;
 }>;
 
 function deviceId(): string {
@@ -67,7 +67,7 @@ export function useRecorder(profileId: string | undefined): RecorderControl {
     finally { setBusy(false); }
   }, [busy]);
 
-  const start = async (walkinRef?: string): Promise<string | null> => {
+  const start = async (): Promise<string | null> => {
     let started: string | null = null;
     setLinkNotice(null);
     await run(async () => {
@@ -84,10 +84,6 @@ export function useRecorder(profileId: string | undefined): RecorderControl {
       setCompleted(null);
       if (isNative) sendNativeRecorder("recorder.start", undefined, ticket); else await recorder.start(ticket);
       started = ticket.session.id;
-      if (walkinRef) {
-        try { await linkRecordingWalkin(ticket.session.id, walkinRef); setLinkNotice("Linked to the CRM walk-in."); }
-        catch { setLinkNotice("Recording started, but the CRM walk-in could not be linked. You can link it later from the conversation."); }
-      }
     });
     return started;
   };

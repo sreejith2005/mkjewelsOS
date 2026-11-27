@@ -122,22 +122,12 @@ export async function startFmsWithoutForm(input: Readonly<{ flowId: string; titl
 export type CrmFormFamilies = Readonly<Partial<Record<"queue" | "lead" | "walkin", string>>>;
 
 /**
- * Reads which forms are linked in CRM Form Settings (get_crm_form_bindings, migration 0373), so the
- * trigger form picker can wire a CRM form to its CRM event. Without CRM access it returns none and
- * every form is offered as an ordinary Forms Library form; the server still validates the trigger.
+ * The forms CRM Form Settings linked to CRM events. The old CRM and its form settings were
+ * removed (migration 0443), so no form is a CRM form any more and every form is offered as an
+ * ordinary Forms Library form. Kept so saved triggers with a CRM source still display.
  */
 export async function loadCrmFormFamilies(): Promise<CrmFormFamilies> {
-  const { data, error } = await supabase.rpc("get_crm_form_bindings");
-  if (error) return {};
-  const bindings = record(data).bindings;
-  const families: Partial<Record<"queue" | "lead" | "walkin", string>> = {};
-  for (const item of Array.isArray(bindings) ? bindings : []) {
-    const row = record(item);
-    const purpose = text(row.purpose);
-    const family = text(row.formFamilyId);
-    if (family && (purpose === "queue" || purpose === "lead" || purpose === "walkin")) families[purpose] = family;
-  }
-  return families;
+  return {};
 }
 
 /**

@@ -42,10 +42,8 @@ select ok(not has_function_privilege('authenticated', 'permission_effective_for(
 select throws_ok(
   $$insert into role_permissions(tenant_id, user_role, permission_key, is_allowed) values ('15610000-0000-4000-8000-000000000001', 'staff', 'permissions.manage', true)$$,
   '22023', 'Permission permissions.manage cannot be configured', 'protected permissions can never be stored as configuration');
-select ok(exists (select 1 from pg_policies where tablename = 'clients' and policyname = 'clients_section_available' and permissive = 'RESTRICTIVE'), 'CRM tables carry a restrictive section policy');
 select ok(position('current_profile()' in pg_get_functiondef('record_availability_with_audit(uuid,date,availability_status,text)'::regprocedure)) > 0, 'inline actor lookups now read current_profile()');
 select ok(position('assert_module_access(''reports'')' in pg_get_functiondef('get_report_data(text,jsonb)'::regprocedure)) > 0, 'report data is section-gated');
-select ok(position('has_permission(''crm.view'')' in pg_get_functiondef('assert_crm_actor()'::regprocedure)) > 0, 'CRM actor check uses the permission resolver');
 
 set local role authenticated;
 select set_config('request.jwt.claim.role', 'authenticated', true);
@@ -80,7 +78,6 @@ select set_config('request.jwt.claim.sub', '15600000-0000-4000-8000-000000000001
 select lives_ok($$select save_user_access_with_audit('15640000-0000-4000-8000-000000000005', '{"crm.view":"deny"}'::jsonb, 'manager')$$, 'Super Admin denies CRM to one user');
 select set_config('request.jwt.claim.sub', '15600000-0000-4000-8000-000000000005', true);
 select ok(not has_permission('crm.view'), 'user deny wins');
-select throws_ok($$select search_crm_clients('{}'::jsonb)$$, '42501', 'CRM access denied', 'denied user cannot call the CRM API directly');
 
 -- Explicit user grant beyond the role, enforced by the availability contract.
 select set_config('request.jwt.claim.sub', '15600000-0000-4000-8000-000000000006', true);

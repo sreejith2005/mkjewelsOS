@@ -1,5 +1,5 @@
 begin;
-select plan(58);
+select plan(56);
 
 select has_column('public', 'user_profiles', 'secondary_buddy_id', 'profiles store a secondary buddy');
 select col_is_fk('public', 'user_profiles', 'secondary_buddy_id', 'secondary buddy is referentially enforced');
@@ -78,10 +78,9 @@ select ok(
   'reconciliation uses the agreed business timezone'
 );
 select ok(
-  position('client_followups' in pg_get_functiondef('public.reconcile_all_assignment_coverage_with_audit(uuid,date,text)'::regprocedure)) > 0
-  and position('fms_instance_stages' in pg_get_functiondef('public.reconcile_all_assignment_coverage_with_audit(uuid,date,text)'::regprocedure)) > 0
+  position('fms_instance_stages' in pg_get_functiondef('public.reconcile_all_assignment_coverage_with_audit(uuid,date,text)'::regprocedure)) > 0
   and position('task_instances' in pg_get_functiondef('public.reconcile_all_assignment_coverage_with_audit(uuid,date,text)'::regprocedure)) > 0,
-  'reconciliation covers Tasks, CRM follow-ups, and FMS stages'
+  'reconciliation covers Tasks and FMS stages (CRM follow-ups removed in 0443)'
 );
 select ok(
   position('manager_review' in pg_get_functiondef('public.reconcile_all_assignment_coverage_with_audit(uuid,date,text)'::regprocedure)) > 0,
@@ -162,12 +161,6 @@ select ok(exists(select 1 from notifications where user_profile_id='84400000-000
 insert into task_watchers(tenant_id,task_instance_id,user_profile_id,created_by)
 values('84100000-0000-4000-8000-000000000001','84500000-0000-4000-8000-000000000004','84400000-0000-4000-8000-000000000003','84400000-0000-4000-8000-000000000001');
 select ok(exists(select 1 from notification_events where idempotency_key like 'task_watcher:%' and payload->'_assigned_user_ids' @> jsonb_build_array('84400000-0000-4000-8000-000000000003'::uuid)),'watcher assignment notification remains queued');
-insert into clients(id,tenant_id,branch_id,phone,first_name,assigned_crm_id)
-values('84600000-0000-4000-8000-000000000001','84100000-0000-4000-8000-000000000001','84200000-0000-4000-8000-000000000001','0000000099','Coverage Client','84400000-0000-4000-8000-000000000002');
-insert into client_followups(id,client_id,tenant_id,branch_id,assigned_to,due_date,status,subject,created_by)
-values('84700000-0000-4000-8000-000000000001','84600000-0000-4000-8000-000000000001','84100000-0000-4000-8000-000000000001','84200000-0000-4000-8000-000000000001','84400000-0000-4000-8000-000000000002',(now() at time zone 'Asia/Kolkata')::date,'open','Creation coverage','84400000-0000-4000-8000-000000000001');
-select is((select assigned_to from client_followups where id='84700000-0000-4000-8000-000000000001'),'84400000-0000-4000-8000-000000000004'::uuid,'new CRM follow-ups use the central coverage resolver');
-select is((select coverage_resolution from client_followups where id='84700000-0000-4000-8000-000000000001'),'secondary_buddy','CRM creation records the selected coverage path');
 
 insert into user_availability(tenant_id,user_profile_id,date,status,reason,logged_by)
 values('84100000-0000-4000-8000-000000000001','84400000-0000-4000-8000-000000000005',(now() at time zone 'Asia/Kolkata')::date,'absent','uncovered fixture','84400000-0000-4000-8000-000000000001');

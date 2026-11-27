@@ -33,12 +33,3 @@ export async function recordingSnapshot(id: string): Promise<RecordingSnapshot> 
   });
   return { session: parseRecordingSession(value.session), segments: value.segments.map(parseTranscriptSegment), alerts };
 }
-export async function recordingWalkins(): Promise<ReadonlyArray<{ ref: string; label: string }>> {
-  const { data, error } = await supabase.rpc("recorder_linkable_walkins");
-  if (error || !Array.isArray(data)) return refused();
-  return data.map((raw) => { const item = recordingObject(raw); if (typeof item.ref !== "string" || typeof item.label !== "string") throw new Error("Invalid walk-in response"); return { ref: item.ref, label: item.label }; });
-}
-export async function linkRecordingWalkin(sessionId: string, ref: string): Promise<void> {
-  const { error } = await supabase.rpc("recorder_link_customer", { p_session_id: sessionId, p_customer_ref: ref });
-  if (error) return refused();
-}
