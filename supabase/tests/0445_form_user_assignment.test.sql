@@ -48,12 +48,12 @@ end $$;
 do $$
 declare t uuid; b uuid; d uuid; a uuid:=gen_random_uuid(); p uuid; f uuid:=gen_random_uuid();
 begin
- insert into tenants(name,slug) values('0444 foreign','form-users-foreign-0444') returning id into t;
- insert into branches(tenant_id,name,code) values(t,'Foreign store','FOREIGN0444') returning id into b;
- insert into departments(tenant_id,branch_id,name,code) values(t,b,'Foreign department','FOREIGND0444') returning id into d;
- insert into auth.users(id,aud,role,email,encrypted_password,created_at,updated_at) values(a,'authenticated','authenticated','foreign0444@example.in','x',now(),now());
+ insert into tenants(name,slug) values('0445 foreign','form-users-foreign-0445') returning id into t;
+ insert into branches(tenant_id,name,code) values(t,'Foreign store','FOREIGN0445') returning id into b;
+ insert into departments(tenant_id,branch_id,name,code) values(t,b,'Foreign department','FOREIGND0445') returning id into d;
+ insert into auth.users(id,aud,role,email,encrypted_password,created_at,updated_at) values(a,'authenticated','authenticated','foreign0445@example.in','x',now(),now());
  insert into user_profiles(tenant_id,auth_user_id,branch_id,department_id,employee_name,employee_code,email,user_role,working_status,account_status,is_login_enabled)
- values(t,a,b,d,'Foreign employee','FOREIGN0444','foreign0444@example.in','staff','active','active',true) returning id into p;
+ values(t,a,b,d,'Foreign employee','FOREIGN0445','foreign0445@example.in','staff','active','active',true) returning id into p;
  insert into fx values('foreign',p,a);
  insert into form_templates(id,family_id,tenant_id,name,is_active,lifecycle,permissions) values(f,f,t,'Foreign form',true,'draft','{"roles":["staff"]}');
  insert into form_fields(form_template_id,field_key,field_name,field_type,sort_order) values(f,'person','Person','user_dropdown',0);
