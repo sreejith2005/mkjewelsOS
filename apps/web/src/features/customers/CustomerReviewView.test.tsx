@@ -3,8 +3,8 @@ import { cleanup, fireEvent, render, screen, within } from "@testing-library/rea
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { CustomerReviewItem, CustomerReviewSide } from "./api";
 
-const mocks = vi.hoisted(() => ({ list: vi.fn(), decide: vi.fn() }));
-vi.mock("./api", () => ({ loadCustomerReviewList: mocks.list, decideCustomerReview: mocks.decide }));
+const mocks = vi.hoisted(() => ({ list: vi.fn(), decide: vi.fn(), queue: vi.fn() }));
+vi.mock("./api", () => ({ loadCustomerReviewList: mocks.list, decideCustomerReview: mocks.decide, loadCustomerReviewQueue: mocks.queue }));
 
 import { CustomerReviewView } from "./CustomerReviewView";
 
@@ -59,4 +59,31 @@ it("shows the server's refusal", async () => {
   mocks.list.mockRejectedValue(new Error("Section access denied"));
   render(<CustomerReviewView {...handlers()} />);
   expect(await screen.findByText("Section access denied")).toBeTruthy();
+});
+
+it("same name, different numbers: merge or keep separate (migration 0453)", async () => {
+  mocks.queue.mockResolvedValue({ total: 1, items: [{ id: "q1", kind: "same_name", note: null, created_at: "2026-11-28T06:00:00Z", other_name: null, other_name_rows: null,
+    a: side("MKC-100030", "Meera Kapoor", "919820053001"), b: side("MKC-100031", "Meera Kapoor", "919820053002") }] });
+  mocks.decide.mockResolvedValue({ result: "merged", client_code: "MKC-100030" });
+  render(<CustomerReviewView {...handlers()} />);
+  fireEvent.click(screen.getByRole("tab", { name: "Same name, different numbers" }));
+  const pair = await screen.findByRole("article", { name: "MKC-100030 and MKC-100031" });
+  expect(mocks.queue).toHaveBeenCalledWith("same_name");
+  expect(screen.getByText("1 to decide")).toBeTruthy();
+  fireEvent.click(within(pair).getByRole("button", { name: "Merge" }));
+  expect(await screen.findByText("MKC-100030 and MKC-100031: Merged into one customer.")).toBeTruthy();
+  expect(mocks.decide).toHaveBeenCalledWith("q1", true);
+});
+
+it("one number, different names: split the other name off", async () => {
+  mocks.queue.mockResolvedValue({ total: 1, items: [{ id: "q2", kind: "shared_phone", note: null, created_at: "2026-11-28T06:00:00Z", other_name: "Kiran Mehta", other_name_rows: 2,
+    a: side("MKC-100040", "Asha Mehta", "919820053003"), b: null }] });
+  mocks.decide.mockResolvedValue({ result: "split", client_code: "MKC-100041" });
+  render(<CustomerReviewView {...handlers()} />);
+  fireEvent.click(screen.getByRole("tab", { name: "One number, different names" }));
+  const item = await screen.findByRole("article", { name: "MKC-100040 and Kiran Mehta" });
+  expect(within(item).getByText(/Written on 2 sheet rows/)).toBeTruthy();
+  fireEvent.click(within(item).getByRole("button", { name: "Different people (split off)" }));
+  expect(await screen.findByText("MKC-100040 and Kiran Mehta: Split off as its own customer in the same family.")).toBeTruthy();
+  expect(mocks.decide).toHaveBeenCalledWith("q2", false);
 });

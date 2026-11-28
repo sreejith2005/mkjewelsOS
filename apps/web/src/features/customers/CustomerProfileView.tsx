@@ -3,8 +3,8 @@ import { ArrowLeft, CalendarClock, MessageCircle, Phone } from "lucide-react";
 import { Button, Notice } from "@/components/ui";
 import { errorMessage, titleCase } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { callPartsLabel, callSummary, CUSTOMER_STAGE_LABELS, daysAgoLabel, formatPhone, type CustomerLifecycleStage } from "@jewelos/core";
-import { loadCustomerClientPage, loadCustomerTimeline, type CustomerAnswer, type CustomerClientPage, type CustomerTimelineEntry } from "./api";
+import { callPartsLabel, callSummary, CUSTOMER_DATA_PROBLEM_LABELS, CUSTOMER_STAGE_LABELS, daysAgoLabel, formatPhone, type CustomerDataProblem, type CustomerLifecycleStage } from "@jewelos/core";
+import { loadCustomerClientPage, loadCustomerTimeline, setCustomerDataReview, type CustomerAnswer, type CustomerClientPage, type CustomerTimelineEntry } from "./api";
 import { appointmentLabel, channelLabel, followUpLabel, formatDate, formatDateTime, formatProfileDate, RESULT_LABEL, RESULT_TONE } from "./format";
 import { InfoCard, InfoRow, Tags, type EarlierValue } from "./parts";
 
@@ -89,6 +89,42 @@ function AnswerRow({ answers, field }: { answers: readonly CustomerAnswer[]; fie
     <InfoRow current={current ? `${current.source_label}, ${formatDate(current.observed_at)}` : null} earlier={earlier} empty={!current} label={field.label}>
       {current ? answerValue(current) : null}
     </InfoRow>
+  );
+}
+
+/**
+ * A customer set aside from the main list for bad data (migration 0451), and
+ * the button that moves them back in or sets them aside again (0452).
+ */
+function DataProblemNotice({ page, onChanged }: { page: CustomerClientPage; onChanged: (main: boolean) => void }) {
+  const [saving, setSaving] = useState(false);
+  const [failure, setFailure] = useState<string | null>(null);
+  const problems = page.data_problems ?? [];
+  if (!problems.length) return null;
+  const labels = problems.map((key) => CUSTOMER_DATA_PROBLEM_LABELS[key as CustomerDataProblem] ?? key.replace(/_/g, " ")).join(", ");
+  const inMain = page.data_review === "main";
+  const decide = async (main: boolean) => {
+    setSaving(true); setFailure(null);
+    try { await setCustomerDataReview(String(page.client.client_code), main); onChanged(main); }
+    catch (reason) { setFailure(errorMessage(reason)); } finally { setSaving(false); }
+  };
+  return (
+    <div className="mt-3">
+      <Notice tone={inMain ? "neutral" : "task"}>
+        <span className="block">
+          Data problem: {labels}.{" "}
+          {inMain
+            ? `Moved into the main customer list${page.data_reviewed_by ? ` by ${page.data_reviewed_by}` : ""}${page.data_reviewed_at ? ` on ${formatDate(page.data_reviewed_at)}` : ""}.`
+            : "Set aside: not in the main customer list (find it under Filters, Data problems)."}
+        </span>
+        {page.can_review_data ? (
+          <span className="mt-2 block">
+            <Button disabled={saving} onClick={() => void decide(!inMain)} variant="secondary">{inMain ? "Set aside again" : "Move to main list"}</Button>
+          </span>
+        ) : null}
+        {failure ? <span className="mt-1 block text-danger">{failure}</span> : null}
+      </Notice>
+    </div>
   );
 }
 
@@ -364,6 +400,7 @@ export function CustomerProfileView({ clientCode, onBack, onOpenClient, onOpenIn
           ? <div className="mt-3"><Notice tone="danger">Do not contact this customer. They asked not to be contacted, so they are hidden from the list and from calling.</Notice></div>
           : data.archived ? <div className="mt-3"><Notice>This customer is archived{data.archive_reason ? ` (${titleCase(data.archive_reason)})` : ""}.</Notice></div> : null}
         {client.do_not_call === true && data.archive_reason !== "do_not_contact" ? <div className="mt-3"><Notice tone="danger">Do not call this customer.</Notice></div> : null}
+        <DataProblemNotice onChanged={(main) => setData({ ...data, data_review: main ? "main" : null, data_reviewed_at: new Date().toISOString(), data_reviewed_by: null })} page={data} />
       </header>
       {error ? <div className="mb-3"><Notice tone="danger">{error}</Notice></div> : null}
 

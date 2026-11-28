@@ -102,6 +102,12 @@ export type CustomerClientPage = CustomerProfile & Readonly<{
   tags?: readonly string[];
   archived: boolean;
   archive_reason: string | null;
+  /** Migration 0451/0452: bad-data kinds, whether a person moved the customer into the main list, and whether this person may. */
+  data_problems?: readonly string[];
+  data_review?: "main" | null;
+  data_reviewed_at?: string | null;
+  data_reviewed_by?: string | null;
+  can_review_data?: boolean;
 }>;
 
 /** Everything about one interaction (public.customer_get_interaction_page). */
@@ -152,7 +158,26 @@ export type CustomerReviewItem = Readonly<{
   linking_rows: readonly Readonly<{ source: string; sheet_row: number | null }>[] | null;
 }>;
 
-export type CustomerReviewResult = Readonly<{ result: "merged" | "kept_separate" | "kept_joined" | "separated"; client_code: string | null }>;
+/**
+ * Migration 0453: "same_name" pairs two records with the same full name and different numbers;
+ * "shared_phone" is one record (a, b null) whose number also carries other_name.
+ */
+export type CustomerReviewQueueKind = "same_name" | "shared_phone";
+export type CustomerReviewQueueItem = Readonly<{
+  id: string; kind: CustomerReviewQueueKind; note: string | null; created_at: string;
+  a: CustomerReviewSide; b: CustomerReviewSide | null; other_name: string | null; other_name_rows: number | null;
+}>;
+export type CustomerReviewQueuePage = Readonly<{ total: number; items: readonly CustomerReviewQueueItem[] }>;
+
+export type CustomerReviewResult = Readonly<{ result: "merged" | "kept_separate" | "kept_joined" | "separated" | "kept_names" | "split"; client_code: string | null }>;
+
+/** 25 open checks of one kind, from offset (migration 0453). */
+export async function loadCustomerReviewQueue(kind: CustomerReviewQueueKind, offset = 0): Promise<CustomerReviewQueuePage> {
+  const { data, error } = await db().rpc("customer_review_queue", { p_kind: kind, p_offset: offset });
+  if (error) throw error;
+  // Shape fixed by migration 0453.
+  return data as unknown as CustomerReviewQueuePage;
+}
 
 export async function loadCustomerReviewList(): Promise<CustomerReviewItem[]> {
   const { data, error } = await db().rpc("customer_review_list", {});
@@ -166,6 +191,12 @@ export async function decideCustomerReview(reviewId: string, same: boolean): Pro
   if (error) throw error;
   // Shape fixed by migration 0438.
   return data as unknown as CustomerReviewResult;
+}
+
+/** Move a customer with a data problem into the main list (main = true) or set them aside again (migration 0452). */
+export async function setCustomerDataReview(clientCode: string, main: boolean): Promise<void> {
+  const { error } = await db().rpc("customer_set_data_review", { p_client_code: clientCode, p_main: main });
+  if (error) throw error;
 }
 
 /**

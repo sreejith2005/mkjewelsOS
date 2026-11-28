@@ -124,6 +124,7 @@ function CustomerMasterList({ onOpenClient, onOpenReview }: { onOpenClient: (cli
   if (filters.followUpDue) chips.push({ label: "Follow-up due", clear: { followUpDue: false } });
   if (filters.dataProblem) chips.push({ label: filters.dataProblem === "any" ? "All data problems" : CUSTOMER_DATA_PROBLEM_LABELS[filters.dataProblem], clear: { dataProblem: "" } });
   const panelFilters = chips.length;
+  const reviewCount = (options?.duplicates_to_review ?? 0) + (options?.same_name_to_review ?? 0) + (options?.shared_phone_to_review ?? 0);
 
   return (
     <section className="w-full">
@@ -131,13 +132,14 @@ function CustomerMasterList({ onOpenClient, onOpenReview }: { onOpenClient: (cli
         <div className="min-w-0">
           <h1 className="font-display text-[1.9rem] font-semibold leading-tight text-task-text sm:text-[2.2rem]">Customers</h1>
           <p className="text-sm text-task-text-muted">
-            {options ? `${options.total.toLocaleString("en-IN")} people` : "Every client and lead"}
+            {options ? `${(options.total - (options.with_data_problems ?? 0)).toLocaleString("en-IN")} people` : "Every client and lead"}
             {lastImport ? `, sheets read ${formatDateTime(lastImport)}` : ""}
+            {options?.with_data_problems ? `. ${options.with_data_problems.toLocaleString("en-IN")} with data problems are set aside (Filters, Data problems).` : ""}
           </p>
           {options ? <SheetReadProblems items={options.import} /> : null}
         </div>
         <div className="flex flex-wrap gap-2">
-          {options?.duplicates_to_review ? <Button onClick={onOpenReview} variant="secondary">Possibly same person ({options.duplicates_to_review})</Button> : null}
+          {reviewCount ? <Button onClick={onOpenReview} variant="secondary">Review duplicates ({reviewCount.toLocaleString("en-IN")})</Button> : null}
         </div>
       </header>
 
@@ -163,7 +165,7 @@ function CustomerMasterList({ onOpenClient, onOpenReview }: { onOpenClient: (cli
           </div>
         ) : null}
         <div aria-label="Type" className="flex gap-1.5 overflow-x-auto" role="group">
-          {([["", "All", options?.total], ["buyer", "Clients", segmentCount("buyer")], ["lead", "Leads", leadCount]] as const).map(([key, label, n]) => (
+          {([["", "All", options ? options.total - (options.with_data_problems ?? 0) : undefined], ["buyer", "Clients", segmentCount("buyer")], ["lead", "Leads", leadCount]] as const).map(([key, label, n]) => (
             <button aria-pressed={filters.segment === key} className={`min-h-10 shrink-0 rounded-full border px-4 text-sm font-semibold ${filters.segment === key ? "border-gold bg-gold/15 text-task-text" : "border-task-border bg-task-bg text-task-text-muted hover:text-task-text"}`} key={label} onClick={() => change({ segment: key })} type="button">
               {label}{n !== undefined ? <span className="ml-1.5 font-normal">{n.toLocaleString("en-IN")}</span> : null}
             </button>
