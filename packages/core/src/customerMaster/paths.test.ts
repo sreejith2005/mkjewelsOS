@@ -7,6 +7,7 @@ describe("customer master links", () => {
     expect(parseCustomerMasterPath("/crm/master/c/MKC-100234")).toEqual({ view: "client", code: "MKC-100234" });
     expect(parseCustomerMasterPath("/crm/master/review")).toEqual({ view: "review" });
     expect(parseCustomerMasterPath("/crm/master/table")).toEqual({ view: "table" });
+    expect(parseCustomerMasterPath("/crm/master/standards")).toEqual({ view: "standards" });
     expect(parseCustomerMasterPath("/crm/master/c/mkc-100234")).toEqual({ view: "client", code: "MKC-100234" });
   });
 

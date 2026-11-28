@@ -5,7 +5,7 @@ import { errorMessage } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import {
   CUSTOMER_DATA_PROBLEM_LABELS, CUSTOMER_FILTER_OPERATOR_LABELS, CUSTOMER_TABLE_MAX_COLUMNS, CUSTOMER_TABLE_PAGE_SIZE, customerCellText, customerFilterCount,
-  customerFilterOperators, customerFilterValueKind, DEFAULT_CUSTOMER_TABLE_COLUMNS, EMPTY_CUSTOMER_TABLE_STATE, formatPhone,
+  customerCodeFallbackLabel, customerFilterOperators, customerFilterValueKind, DEFAULT_CUSTOMER_TABLE_COLUMNS, EMPTY_CUSTOMER_TABLE_STATE, formatPhone,
   type CustomerDataProblem, type CustomerFilterCondition, type CustomerFilterGroup, type CustomerFilterOperator, type CustomerTableField, type CustomerTableState,
 } from "@jewelos/core";
 import { loadCustomerTable, loadCustomerTableFields, loadCustomerTableValues, type CustomerTablePage } from "./api";
@@ -325,31 +325,43 @@ function ConditionEditor({ condition, fields, franchise, onChange, onRemove }: {
   );
 }
 
-/** Pick values of a text or list field from the values the data holds, most common first. */
+/** Labels of reference codes seen in value pickers, so chips read well after a reload of the list. */
+const codeLabels = new Map<string, string>();
+
+/**
+ * Pick values of a text or list field from the values the data holds, most
+ * common first. A standardized field offers each value once with its stable
+ * code (migration 0455); the code is what the filter keeps.
+ */
 function ValuesPicker({ field, franchise, value, onChange }: {
   field: CustomerTableField; franchise: string; value: readonly string[]; onChange: (value: string[]) => void;
 }) {
   const [query, setQuery] = useState("");
-  const [options, setOptions] = useState<{ value: string; count: number }[] | null>(null);
+  const [options, setOptions] = useState<{ value: string; count: number; code?: string | null }[] | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
   useEffect(() => {
     let current = true;
     const timer = window.setTimeout(() => {
       loadCustomerTableValues(field.key, query, franchise)
-        .then((rows) => { if (current) { setOptions(rows); setFailure(null); } })
+        .then((rows) => {
+          if (!current) return;
+          for (const row of rows) if (row.code) codeLabels.set(row.code, row.value);
+          setOptions(rows); setFailure(null);
+        })
         .catch((reason: unknown) => { if (current) setFailure(errorMessage(reason)); });
     }, SEARCH_DEBOUNCE_MS);
     return () => { current = false; window.clearTimeout(timer); };
   }, [field.key, query, franchise]);
   const chosen = new Set(value);
   const toggle = (item: string) => onChange(chosen.has(item) ? value.filter((other) => other !== item) : [...value, item]);
+  const labelOf = (item: string) => codeLabels.get(item) ?? (item.includes(":") ? customerCodeFallbackLabel(item) : item);
   return (
     <div className="rounded-lg border border-task-border p-2">
       {value.length ? (
         <div className="mb-2 flex flex-wrap gap-1">
           {value.map((item) => (
-            <button aria-label={`Remove ${item}`} className="inline-flex min-h-8 items-center gap-1 rounded-full border border-gold/50 bg-gold/10 pl-2 pr-1 text-xs font-medium text-task-text" key={item} onClick={() => toggle(item)} type="button">
-              {item}<X aria-hidden className="h-3.5 w-3.5" />
+            <button aria-label={`Remove ${labelOf(item)}`} className="inline-flex min-h-8 items-center gap-1 rounded-full border border-gold/50 bg-gold/10 pl-2 pr-1 text-xs font-medium text-task-text" key={item} onClick={() => toggle(item)} type="button">
+              {labelOf(item)}<X aria-hidden className="h-3.5 w-3.5" />
             </button>
           ))}
         </div>
@@ -357,13 +369,22 @@ function ValuesPicker({ field, franchise, value, onChange }: {
       <input aria-label={`Find a value of ${field.label}`} className="field mb-1" onChange={(event) => setQuery(event.target.value)} placeholder="Find a value" value={query} />
       {failure ? <p className="text-xs text-danger">{failure}</p> : null}
       <div className="max-h-48 overflow-y-auto">
-        {(options ?? []).map((option) => (
-          <label className="flex min-h-8 items-center gap-2 text-sm text-task-text" key={option.value}>
-            <input checked={chosen.has(option.value)} className="h-4 w-4" onChange={() => toggle(option.value)} type="checkbox" />
-            <span className="flex-1 truncate">{option.value}</span>
-            <span className="text-xs text-task-text-muted">{option.count.toLocaleString("en-IN")}</span>
-          </label>
-        ))}
+        {(options ?? []).map((option) => {
+          // A standardized field's "not standardized yet" row is a count, not a choice.
+          const key = field.standardized ? option.code ?? null : option.value;
+          return key === null ? (
+            <p className="flex min-h-8 items-center gap-2 text-sm italic text-task-text-muted" key={`none-${option.value}`}>
+              <span className="flex-1 truncate">{option.value}</span>
+              <span className="text-xs">{option.count.toLocaleString("en-IN")}</span>
+            </p>
+          ) : (
+            <label className="flex min-h-8 items-center gap-2 text-sm text-task-text" key={key}>
+              <input checked={chosen.has(key)} className="h-4 w-4" onChange={() => toggle(key)} type="checkbox" />
+              <span className="flex-1 truncate">{option.value}</span>
+              <span className="text-xs text-task-text-muted">{option.count.toLocaleString("en-IN")}</span>
+            </label>
+          );
+        })}
         {options && options.length === 0 ? <p className="text-xs text-task-text-muted">No values.</p> : null}
       </div>
     </div>

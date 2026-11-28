@@ -11,6 +11,8 @@ export type CustomerTag = Readonly<{ key: string; label: string; tone: CustomerT
 
 const TAGS: Record<string, Omit<CustomerTag, "key">> = {
   do_not_contact: { label: "Do not contact", tone: "danger" },
+  // A lead contacted once, by call, message or anything else (owner, 2026-11-28; migration 0455).
+  new_lead: { label: "New lead", tone: "gold" },
   wrong_number: { label: "Wrong number", tone: "danger" },
   invalid_number: { label: "Invalid number", tone: "warning" },
   abroad: { label: "Abroad", tone: "gold" },

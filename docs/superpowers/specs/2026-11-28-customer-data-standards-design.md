@@ -1,6 +1,6 @@
 # Customer data standards: audit and proposed architecture
 
-Status: proposal for owner review (2026-11-28). Nothing here is built yet.
+Status: owner decisions taken 2026-11-28 (section 8); first slice built in migration 0455.
 Brief: the owner's "Universal Customer Data Standardization, Reference Data
 Management & Data Governance" document (chat, 2026-11-28).
 
@@ -230,3 +230,16 @@ targeted reprocessing and the permission checks.
 5. Who may approve mappings: Super Admin only, or a data team role?
 6. Winner change: skip "None", "P" and similar so a lower-ranked real value
    wins (recommended). This changes which value shows for some customers.
+
+## 8. Owner decisions (2026-11-28) and what 0455 built
+
+* **Labels:** the most used spelling wins (`customer.ref_relabel_by_usage`); every other name stays an alias and every raw value stays on the customer page.
+* **Place:** country, state, district, city and locality are separate fields. A known locality gives City (for example Borivali gives City Mumbai and Locality Borivali). A name found in several places is read from the customer's pincode or state when that settles it; otherwise it is "Unclear" and goes to review. Unknown localities stay as written until someone creates them under a city.
+* **Community:** kept as a field and filter, behind `customers.view_sensitive`. For now every role has it; hiding comes later. The server enforces it in the table, values, list filters, profile, customer page and form lookup. Only spelling is tidied; a place written in COMMUNITY is flagged and never moved.
+* **Sources:** "First source" keeps its meaning. New fields: "Imported from" (`first_source` sheet), "Record origin (as written)" (`first_origin`) and "How they found us" (`acquisition_source`, standardized from "How they came" and "First contact through"). An import origin is never used as the acquisition source.
+* **Permissions:** nine keys (view sensitive, view data quality, suggest, approve, manage reference values, approve high impact, manage field policies, reprocess, roll back), all Super Admin except view sensitive. A suggestion from someone who cannot approve is saved as a draft.
+* **Validity before rank:** missing, invalid, ambiguous and wrong-field readings never win. A verified correction or a requested removal (`customer.value_corrections`) beats every sheet.
+* **New lead:** a tag for a lead (not a client) contacted exactly once. The first Stage is now labelled "Not spoken to yet".
+* **The new-field test:** Sugar was turned on through `customer_std_set_policy`, with no field-specific code (pgTAP 0455).
+* **Measured locally (Postgres 16, synthetic data):** writing a standardized answer costs about 1.7 ms instead of 1.0 ms. A table count with a code filter over 1,00,000 customers takes about 40 ms (GIN containment), the same as the old text filter.
+* **First run:** jobs re-read every answer of the slice in the background (cron `customer-standards-jobs`, 3,000 answers a minute). Until a customer is reached, they show as before.

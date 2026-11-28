@@ -1,4 +1,5 @@
 import { getSupabase as db } from "@jewelos/api-client/client";
+import type { Json } from "@jewelos/api-client";
 import {
   customerListFilterPayload, customerTableRequest, type CustomerCallLog, type CustomerListFilterOptions, type CustomerListFilters, type CustomerListPage,
   type CustomerTableField, type CustomerTableState,
@@ -90,6 +91,12 @@ export type CustomerAppointment = Readonly<{
 }>;
 export type CustomerProduct = Readonly<{ code: string | null; category: string | null; interest: string; interaction_code: string; occurred_at: string }>;
 
+/** One standardized field of a customer (migration 0455). */
+export type CustomerFieldStandard = Readonly<{
+  value: string | readonly string[] | null; code: string | readonly string[] | null; status: string | null;
+  readings: readonly Readonly<{ raw: string; source: string | null; observed_at: string; status: string; method: string; value: string | null }>[];
+}>;
+
 /** Everything about one customer (public.customer_get_client_page). */
 export type CustomerClientPage = CustomerProfile & Readonly<{
   answers: readonly CustomerAnswer[];
@@ -107,6 +114,8 @@ export type CustomerClientPage = CustomerProfile & Readonly<{
   archive_reason: string | null;
   /** Migration 0451/0452: bad-data kinds, whether a person moved the customer into the main list, and whether this person may. */
   data_problems?: readonly string[];
+  /** Migration 0455: per standardized field, the value used and every reading it came from. */
+  standards?: Readonly<Record<string, CustomerFieldStandard>>;
   data_review?: "main" | null;
   data_reviewed_at?: string | null;
   data_reviewed_by?: string | null;
@@ -243,8 +252,104 @@ export async function loadCustomerTable(state: CustomerTableState, page: number)
 }
 
 /** The values a text or list field holds, most common first (up to 300). */
-export async function loadCustomerTableValues(field: string, query = "", franchise = ""): Promise<{ value: string; count: number }[]> {
+export async function loadCustomerTableValues(field: string, query = "", franchise = ""): Promise<{ value: string; count: number; code?: string | null }[]> {
   const { data, error } = await db().rpc("customer_table_values", { p_field: field, p_q: query || null, p_franchise: franchise || null });
   if (error) throw error;
-  return (data ?? []) as unknown as { value: string; count: number }[];
+  return (data ?? []) as unknown as { value: string; count: number; code?: string | null }[];
+}
+
+/* ---------------------------------------------------------------------------
+ * Data standards (migration 0455): fields, review queue, rules, reference values.
+ * ------------------------------------------------------------------------- */
+export type CustomerStdField = Readonly<{
+  key: string; label: string; policy: "none" | "reference" | "place"; domain: string | null; multi: boolean; sensitive: boolean;
+  output_field: string; meaning: string | null; observations: number; customers: number;
+  statuses: Readonly<Record<string, number>>; values: number;
+}>;
+export type CustomerStdOverview = Readonly<{
+  fields: readonly CustomerStdField[];
+  jobs: readonly Readonly<{ id: string; field: string; reason: string; status: string; processed: number; clients: number; created_at: string; finished_at: string | null }>[];
+  can: Readonly<{ suggest: boolean; approve: boolean; high_impact: boolean; reference: boolean; policies: boolean; reprocess: boolean; rollback: boolean }>;
+}>;
+export type CustomerRefOption = Readonly<{ code: string; label: string; kind: string | null; parent: string | null; score?: number }>;
+export type CustomerStdQueueItem = Readonly<{
+  input_key: string; examples: readonly string[]; observations: number; customers: number; status: string; sources: readonly string[];
+  rule: Readonly<{ id: string; version: number; status: string; outputs: unknown }> | null;
+  candidates: readonly CustomerRefOption[]; suggestions: readonly CustomerRefOption[];
+}>;
+export type CustomerStdQueue = Readonly<{ field: string; label: string; domain: string | null; policy: string; total: number; items: readonly CustomerStdQueueItem[] }>;
+/** How a value is to be read (public.customer_std_decide). */
+export type CustomerStdDecision =
+  | Readonly<{ map: string }>
+  | Readonly<{ status: "missing" | "invalid" | "ambiguous" | "other" }>
+  | Readonly<{ create: Readonly<{ label: string; kind?: string; parent?: string; aliases?: readonly string[] }> }>
+  | Readonly<{ move: Readonly<{ field: string; code: string }> }>;
+export type CustomerStdRule = Readonly<{
+  id: string; input_key: string; source: string | null; outputs: readonly Readonly<{ field: string; code?: string; status?: string; label?: string | null }>[];
+  status: string; version: number; reason: string | null; created_by: string | null; created_at: string;
+  approved_by: string | null; approved_at: string | null; ended_by: string | null; ended_at: string | null;
+}>;
+export type CustomerRefValue = Readonly<{
+  code: string; label: string; kind: string | null; active: boolean; parent: Readonly<{ code: string; label: string }> | null;
+  superseded_by: string | null; aliases: readonly string[]; customers: number; notes: string | null;
+}>;
+
+export async function loadCustomerStdOverview(): Promise<CustomerStdOverview> {
+  const { data, error } = await db().rpc("customer_std_overview", {});
+  if (error) throw error;
+  // Shape fixed by migration 0455.
+  return data as unknown as CustomerStdOverview;
+}
+
+export async function loadCustomerStdQueue(field: string, show = "open", offset = 0): Promise<CustomerStdQueue> {
+  const { data, error } = await db().rpc("customer_std_queue", { p_field: field, p_show: show, p_offset: offset });
+  if (error) throw error;
+  return data as unknown as CustomerStdQueue;
+}
+
+export async function decideCustomerStd(field: string, inputKey: string, decision: CustomerStdDecision, reason: string | null): Promise<{ rule_id: string; status: "approved" | "draft"; customers: number }> {
+  // The decision is plain JSON; the server checks it against the field, its values and the person's permissions.
+  const { data, error } = await db().rpc("customer_std_decide", { p_field: field, p_input_key: inputKey, p_decision: JSON.parse(JSON.stringify(decision)) as Json, p_reason: reason });
+  if (error) throw error;
+  return data as unknown as { rule_id: string; status: "approved" | "draft"; customers: number };
+}
+
+export async function loadCustomerStdRules(field: string, offset = 0): Promise<CustomerStdRule[]> {
+  const { data, error } = await db().rpc("customer_std_rules", { p_field: field, p_offset: offset });
+  if (error) throw error;
+  return (data ?? []) as unknown as CustomerStdRule[];
+}
+
+export async function endCustomerStdRule(ruleId: string, reason: string): Promise<void> {
+  const { error } = await db().rpc("customer_std_end_rule", { p_rule_id: ruleId, p_reason: reason });
+  if (error) throw error;
+}
+
+export async function reviewCustomerStdDraft(ruleId: string, approve: boolean): Promise<void> {
+  const { error } = await db().rpc("customer_std_review_draft", { p_rule_id: ruleId, p_approve: approve });
+  if (error) throw error;
+}
+
+export async function setCustomerStdPolicy(field: string, policy: "none" | "reference", multi = false): Promise<void> {
+  const { error } = await db().rpc("customer_std_set_policy", { p_field: field, p_policy: policy, p_multi: multi });
+  if (error) throw error;
+}
+
+export async function reprocessCustomerStd(field: string): Promise<void> {
+  const { error } = await db().rpc("customer_std_reprocess", { p_field: field });
+  if (error) throw error;
+}
+
+export async function loadCustomerRefValues(domain: string, query = "", offset = 0): Promise<{ total: number; items: CustomerRefValue[] }> {
+  const { data, error } = await db().rpc("customer_ref_values", { p_domain: domain, p_q: query || null, p_offset: offset });
+  if (error) throw error;
+  return data as unknown as { total: number; items: CustomerRefValue[] };
+}
+
+/** create / rename / alias / remove_alias / deactivate / activate / merge a reference value. */
+export async function saveCustomerRefValue(request: Readonly<Record<string, string | null | undefined>>): Promise<{ code: string }> {
+  const clean = Object.fromEntries(Object.entries(request).filter(([, value]) => value !== undefined && value !== null && value !== ""));
+  const { data, error } = await db().rpc("customer_ref_save", { p_request: clean as unknown as Json });
+  if (error) throw error;
+  return data as unknown as { code: string };
 }

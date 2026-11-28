@@ -75,7 +75,7 @@ select is(pg_temp.names('{"columns": ["name"], "filter": {"items": [{"field": "n
 select throws_ok('select public.customer_table(''{"filter": {"items": [{"field": "name); drop table x; --", "op": "is_empty"}]}}'')', '22023', null, 'unknown fields are refused');
 select throws_ok('select public.customer_table(''{"filter": {"items": [{"field": "first_seen_at", "op": "contains", "value": "x"}]}}'')', '22023', null, 'an operator must fit the type');
 select throws_ok('select public.customer_table(''{"sort": [{"field": "phone"}]}'')', '22023', null, 'only sortable fields sort');
-select is((public.customer_table_values('city') -> 0 ->> 'count')::integer, 1, 'the value picker counts each value');
+select is((public.customer_table_values('city') -> 0 ->> 'count')::integer, 2, 'the value picker counts each value (Mumbai and mumbai are one since 0455)');
 
 select * from finish();
 rollback;

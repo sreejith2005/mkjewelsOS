@@ -48,7 +48,8 @@ export const EMPTY_CUSTOMER_LIST_FILTERS: CustomerListFilters = {
 
 // Owner, 2026-11-18: a client has bought from us; everyone else is a lead.
 export const CUSTOMER_SEGMENT_LABELS: Record<CustomerSegment, string> = { buyer: "Client", "non-buyer": "Lead", lead: "Lead" };
-export const CUSTOMER_STAGE_LABELS: Record<CustomerLifecycleStage, string> = { lead: "New lead", engaged: "Spoken to", visited: "Visited" };
+// "New lead" is now a tag for a lead contacted once (owner, 2026-11-28; migration 0455), so the first stage says what it means.
+export const CUSTOMER_STAGE_LABELS: Record<CustomerLifecycleStage, string> = { lead: "Not spoken to yet", engaged: "Spoken to", visited: "Visited" };
 export const CUSTOMER_CONTACT_LABELS: Record<CustomerContactWindow, string> = {
   any: "Any time",
   not_30: "No contact in 30 days",
@@ -118,6 +119,8 @@ export type CustomerListFilterOptions = Readonly<{
   /** Customers per bad-data kind, and with any kind (migration 0451). */
   data_problems?: Readonly<Partial<Record<CustomerDataProblem, number>>>;
   with_data_problems?: number;
+  /** Migration 0455: whether this person may open Data standards. */
+  can_view_data_quality?: boolean;
 }>;
 
 /** The p_filters object for public.customer_list. Unset filters are left out. */
