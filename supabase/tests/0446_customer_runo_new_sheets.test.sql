@@ -29,13 +29,15 @@ create function pg_temp.call(p_call text) returns customer.interactions language
 -- C1: call log first, then the form in the new sheet, then the same form copied into the old sheet.
 select customer_ingest_store('runo_call_log', jsonb_build_array(pg_temp.log('C1', '9820046001', 2)), '{"next_row": 3}');
 select customer_ingest_apply('runo_call_log', 100);
-select ok((pg_temp.call('C1')).has_call_log and not (pg_temp.call('C1')).has_interaction_form, 'a call log alone is a call');
-select is((pg_temp.call('C1')).call_duration_seconds, 95, '... with its duration');
+select is((select reject_reason from customer.ingest_rows where source = 'runo_call_log' and row_key = 'C1'), 'Not a known customer',
+  'a call log alone for an unknown number makes no customer (0448)');
+select ok(pg_temp.call('C1') is null, '... and no interaction yet');
 
 select customer_ingest_store('runo_live', jsonb_build_array(pg_temp.form('C1', '9820046001', 2)), '{"next_row": 3}');
 select customer_ingest_apply('runo_live', 100);
 select customer_ingest_store('runo', jsonb_build_array(pg_temp.form('C1', '9820046001', 7)), '{"next_row": 8}');
 select customer_ingest_apply('runo', 100);
+select customer_ingest_apply('runo_call_log', 100); -- the form queued the skipped call log again
 select is((select count(*) from customer.interactions where tenant_id = (select id from fx where label = 'tenant') and external_ref = 'C1'), 1::bigint,
   'the call log and both form tabs are one interaction');
 select ok((pg_temp.call('C1')).has_call_log and (pg_temp.call('C1')).has_interaction_form, '... shown as call log and interaction form');
@@ -58,11 +60,13 @@ select is((select count(*) from customer.interaction_products where interaction_
 -- C3: a call log without a phone or name is refused; without a date it is refused.
 select customer_ingest_store('runo_call_log', jsonb_build_array(
   jsonb_build_object('row_key', 'C3', 'sheet_row', 4, 'payload', jsonb_build_object('callId', 'C3', 'Call Start Date', '27/11/2026 12:00:00')),
-  jsonb_build_object('row_key', 'C4', 'sheet_row', 5, 'payload', jsonb_build_object('callId', 'C4', 'Phone', '9820046004'))), '{"next_row": 6}');
+  jsonb_build_object('row_key', 'C4', 'sheet_row', 5, 'payload', jsonb_build_object('callId', 'C4', 'Phone', '9820046002'))), '{"next_row": 6}');
 select is((select count(*) from customer.ingest_rows where source = 'runo_call_log' and row_key in ('C3', 'C4') and status = 'rejected')::integer, 0, 'stored, not yet applied');
 select customer_ingest_apply('runo_call_log', 100);
-select is((select count(*) from customer.ingest_rows where source = 'runo_call_log' and row_key in ('C3', 'C4') and status = 'rejected'), 2::bigint,
-  'a call log with no one to link or no time is rejected');
+select is((select string_agg(row_key || ':' || status || ':' || coalesce(reject_reason, ''), ' | ' order by row_key) from customer.ingest_rows
+  where source = 'runo_call_log' and row_key in ('C3', 'C4')),
+  'C3:applied:Not a known customer | C4:rejected:Call Start Date is missing or unreadable',
+  'a call log with no one to link is skipped; a known number with no time is rejected');
 
 -- Removing C1 from the old sheet keeps the call (it is still in the new sheet and the call log).
 select customer.remove_source_row((select id from customer.ingest_rows where source = 'runo' and row_key = 'C1'));
