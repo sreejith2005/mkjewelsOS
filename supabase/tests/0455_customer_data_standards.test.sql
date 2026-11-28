@@ -120,7 +120,8 @@ select is((select (x ->> 'count')::integer from jsonb_array_elements(public.cust
 select is(pg_temp.n('{"columns": ["name"], "filter": {"items": [{"field": "city", "op": "is_any_of", "value": ["place:bengaluru"]}]}}'), 3,
   'a renamed label keeps its code filter working');
 
--- Review and decisions.
+-- Review and decisions (the review reads counts refreshed in the background since 0456).
+select customer.refresh_std_stats('city');
 select ok(exists (select 1 from jsonb_array_elements(public.customer_std_queue('city') -> 'items') x where x ->> 'input_key' = 'kharghar sector 5'), 'the unknown place is in the review');
 select is(public.customer_std_decide('city', 'kharghar sector 5',
   '{"create": {"label": "Kharghar", "kind": "locality", "parent": "place:navi-mumbai"}}', 'Area of Navi Mumbai') ->> 'status', 'approved', 'a person creates the locality and maps it');
