@@ -22,7 +22,7 @@ export function describeSheetSyncError(code: string | null | undefined): SheetSy
   const detail = split < 0 ? "" : raw.slice(split + 1).trim();
   if (name === "too_many_rows_missing") return {
     problem: `${detail ? `${Number(detail).toLocaleString("en-IN")} rows` : "Many rows"} that were read before are no longer in the sheet, so removing them was stopped to protect the data.`,
-    fix: "Check whether rows were deleted, cut or moved to another tab by mistake, or a filter hides them. Put them back if it was a mistake; if they were meant to go, ask for this sheet to be re-read.",
+    fix: "If the tab fills itself from a formula (IMPORTRANGE, QUERY and so on), the formula may be failing for a while under load; this clears itself on the next read once the rows are back, and nothing is deleted meanwhile. Otherwise check whether rows were deleted, cut or moved to another tab by mistake, or a filter hides them. Put them back if it was a mistake; if they were meant to go, ask for this sheet to be re-read.",
   };
   if (name === "sheet_not_shared") return { problem: "JewelOS is not allowed to open this Google Sheet.", fix: SHARE };
   if (name === "sheet_not_found") return { problem: "The Google Sheet could not be found. It may have been deleted, or replaced by a copy with a new link.", fix: "Restore the sheet from Google Drive's Trash, or send the new sheet link so it can be connected again." };
