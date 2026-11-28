@@ -10,10 +10,10 @@ import { SheetReadProblems } from "@/features/customers/SheetReadProblems";
 import { formatDate, formatDateTime } from "@/features/customers/format";
 import { Tags } from "@/features/customers/parts";
 import {
-  activeCustomerFilterCount, CUSTOMER_CONTACT_LABELS, CUSTOMER_SORT_LABELS, CUSTOMER_STAGE_LABELS,
+  activeCustomerFilterCount, CUSTOMER_CONTACT_LABELS, CUSTOMER_DATA_PROBLEM_LABELS, CUSTOMER_DATA_PROBLEMS, CUSTOMER_SORT_LABELS, CUSTOMER_STAGE_LABELS,
   CUSTOMER_MASTER_PATH, CUSTOMER_REVIEW_PATH, customerInteractionPath, customerProfilePath, daysAgoLabel, EMPTY_CUSTOMER_LIST_FILTERS, formatPhone,
   parseCustomerMasterPath,
-  type CustomerContactWindow, type CustomerLifecycleStage, type CustomerListFilterOptions, type CustomerListFilters,
+  type CustomerContactWindow, type CustomerDataProblem, type CustomerLifecycleStage, type CustomerListFilterOptions, type CustomerListFilters,
   type CustomerListPage, type CustomerListSort, type CustomerSegment,
 } from "@jewelos/core";
 
@@ -56,7 +56,7 @@ export function CustomerMasterPage({ path, navigate }: { path: string; navigate:
 
 /** Every client and lead in one filtered list (/crm/master). */
 function CustomerMasterList({ onOpenClient, onOpenReview }: { onOpenClient: (clientCode: string) => void; onOpenReview: () => void }) {
-  const [filters, setFilters] = useState<CustomerListFilters>(() => remembered?.filters ?? EMPTY_CUSTOMER_LIST_FILTERS);
+  const [filters, setFilters] = useState<CustomerListFilters>(() => ({ ...EMPTY_CUSTOMER_LIST_FILTERS, ...remembered?.filters }));
   const [searchText, setSearchText] = useState(() => remembered?.searchText ?? "");
   const [page, setPage] = useState(() => remembered?.page ?? 0);
   useEffect(() => { remembered = { filters, searchText, page }; }, [filters, searchText, page]);
@@ -122,6 +122,7 @@ function CustomerMasterList({ onOpenClient, onOpenReview }: { onOpenClient: (cli
   if (filters.firstSource) chips.push({ label: sourceLabel(options, filters.firstSource), clear: { firstSource: "" } });
   if (filters.contact !== "any") chips.push({ label: CUSTOMER_CONTACT_LABELS[filters.contact], clear: { contact: "any" } });
   if (filters.followUpDue) chips.push({ label: "Follow-up due", clear: { followUpDue: false } });
+  if (filters.dataProblem) chips.push({ label: filters.dataProblem === "any" ? "All data problems" : CUSTOMER_DATA_PROBLEM_LABELS[filters.dataProblem], clear: { dataProblem: "" } });
   const panelFilters = chips.length;
 
   return (
@@ -191,6 +192,11 @@ function CustomerMasterList({ onOpenClient, onOpenReview }: { onOpenClient: (cli
             </SelectFilter>
             <SelectFilter<CustomerContactWindow> label="Last contact" onChange={(contact) => change({ contact })} value={filters.contact}>
               {(Object.keys(CUSTOMER_CONTACT_LABELS) as CustomerContactWindow[]).map((key) => <option key={key} value={key}>{CUSTOMER_CONTACT_LABELS[key]}</option>)}
+            </SelectFilter>
+            <SelectFilter<CustomerDataProblem | "any" | ""> label="Data problems" onChange={(dataProblem) => change({ dataProblem })} value={filters.dataProblem}>
+              <option value="">Hidden (not in the list)</option>
+              <option value="any">All data problems{options?.with_data_problems !== undefined ? ` (${options.with_data_problems})` : ""}</option>
+              {CUSTOMER_DATA_PROBLEMS.map((key) => <option key={key} value={key}>{CUSTOMER_DATA_PROBLEM_LABELS[key]}{options?.data_problems ? ` (${options.data_problems[key] ?? 0})` : ""}</option>)}
             </SelectFilter>
             <label className="flex min-h-11 items-center gap-3 self-end rounded-lg border border-task-border px-3 text-[15px] font-medium text-task-text">
               <input checked={filters.followUpDue} className="h-5 w-5" onChange={(event) => change({ followUpDue: event.target.checked })} type="checkbox" />

@@ -22,11 +22,28 @@ export type CustomerListFilters = Readonly<{
   sort: CustomerListSort;
   /** Which franchise to show: "" (the person's own), "all", or a franchise id (migration 0433). */
   franchise: string;
+  /** Bad-data customers (migration 0451): "" leaves them out, "any" shows all of them, a key shows one kind. */
+  dataProblem: CustomerDataProblem | "any" | "";
 }>;
+
+/**
+ * Kinds of bad data (migration 0451), in the order the filter offers them.
+ * Customers with any of these are left out of the main list (owner, 2026-11-28).
+ */
+export const CUSTOMER_DATA_PROBLEMS = ["wrong_number", "number_not_exist", "invalid_number", "wrong_data", "not_customer", "staff"] as const;
+export type CustomerDataProblem = (typeof CUSTOMER_DATA_PROBLEMS)[number];
+export const CUSTOMER_DATA_PROBLEM_LABELS: Record<CustomerDataProblem, string> = {
+  wrong_number: "Wrong number (wrong person)",
+  number_not_exist: "Number does not exist",
+  invalid_number: "Not a valid number",
+  wrong_data: "Wrong data",
+  not_customer: "Not a customer",
+  staff: "Staff",
+};
 
 export const EMPTY_CUSTOMER_LIST_FILTERS: CustomerListFilters = {
   query: "", segment: "", lifecycleStage: "", city: "", community: "", firstSource: "",
-  contact: "any", followUpDue: false, sort: "recent", franchise: "",
+  contact: "any", followUpDue: false, sort: "recent", franchise: "", dataProblem: "",
 };
 
 // Owner, 2026-11-18: a client has bought from us; everyone else is a lead.
@@ -71,6 +88,8 @@ export type CustomerListRow = Readonly<{
   next_follow_up_at: string | null;
   /** The franchise the customer belongs to (migration 0433). */
   franchise?: string | null;
+  /** Bad-data kinds (migration 0451); empty for a normal customer. */
+  data_problems?: readonly string[];
 }>;
 
 export type CustomerListPage = Readonly<{ total: number; rows: readonly CustomerListRow[] }>;
@@ -93,6 +112,9 @@ export type CustomerListFilterOptions = Readonly<{
   franchise_view?: readonly string[] | null;
   /** Pairs waiting on the "Possibly same person" review; null without the permission (migration 0438). */
   duplicates_to_review?: number | null;
+  /** Customers per bad-data kind, and with any kind (migration 0451). */
+  data_problems?: Readonly<Partial<Record<CustomerDataProblem, number>>>;
+  with_data_problems?: number;
 }>;
 
 /** The p_filters object for public.customer_list. Unset filters are left out. */
@@ -112,13 +134,14 @@ export function customerListFilterPayload(filters: CustomerListFilters): Record<
   if (filters.followUpDue) payload.follow_up_due = true;
   if (filters.sort !== "recent") payload.sort = filters.sort;
   if (filters.franchise) payload.franchise = filters.franchise;
+  if (filters.dataProblem) payload.data_problems = [filters.dataProblem];
   return payload;
 }
 
 /** How many filters are set, not counting the sort order. */
 export function activeCustomerFilterCount(filters: CustomerListFilters): number {
   return [filters.query.trim(), filters.segment, filters.lifecycleStage, filters.city, filters.community, filters.firstSource,
-    filters.contact !== "any", filters.followUpDue].filter(Boolean).length;
+    filters.contact !== "any", filters.followUpDue, filters.dataProblem].filter(Boolean).length;
 }
 
 /** "Today", "Yesterday", "12 days ago", then the date. Null when never. */
