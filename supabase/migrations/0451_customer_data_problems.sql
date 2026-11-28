@@ -114,7 +114,23 @@ select customer._patch_0451('public.customer_list_filters(text)'::regprocedure,
 
 drop function customer._patch_0451(regprocedure, text, text, integer);
 
--- Every customer once.
+-- Once, for the customers who can have a problem: only they are checked
+-- (checking every customer timed out on the first push, 2026-11-28).
+set statement_timeout = '20min';
+with candidates as (
+  select client_id from customer.client_field_values where field_key = 'wrong_number_reason'
+  union
+  select client_id from customer.client_field_values
+   where (field_key = 'data_status' and upper(btrim(value)) in ('WRONG DATA', 'STAFF'))
+      or (field_key = 'contact_type' and upper(value) like 'NON-CLIENT%')
+  union
+  select client_id from customer.client_identifiers where id_type = 'unverified_phone'
+  union
+  select client_id from customer.interactions
+   where archived_at is null and (non_contact_reason ~* '(incorrect|wrong)' or outcome ~* 'wrong')
+)
 update customer.clients c set data_problems = x.problems
-  from (select id, customer.client_data_problems(id) as problems from customer.clients where merged_into_client_id is null) x
- where c.id = x.id and x.problems <> '{}';
+  from (select k.client_id, customer.client_data_problems(k.client_id) as problems
+          from candidates k join customer.clients cl on cl.id = k.client_id and cl.merged_into_client_id is null) x
+ where c.id = x.client_id and x.problems <> '{}';
+reset statement_timeout;
