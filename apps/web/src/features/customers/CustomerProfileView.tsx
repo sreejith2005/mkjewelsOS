@@ -31,6 +31,8 @@ const CARDS: readonly CardSpec[] = [
   { title: "Store and sales", fields: [
     { key: "client_category", label: "Ticket size" }, { key: "store", label: "Store" }, { key: "salesperson", label: "Salesperson" }, { key: "lead_source", label: "How they came" },
     { key: "first_interaction_source", label: "First contact through" }, { key: "buyer_status", label: "Buyer status (as written)" },
+    { key: "first_purchase_date", label: "First purchase" }, { key: "recent_purchase_date", label: "Latest purchase" },
+    { key: "last_interaction_date", label: "Last interaction (as written)" },
     { key: "client_bought_any_product", label: "Bought any product" }, { key: "not_bought_reasons", label: "Why not bought" },
   ] },
   { title: "Product interests", fields: [
@@ -62,6 +64,7 @@ function answerValue(answer: CustomerAnswer): string {
     const match = /^--(\d{2})-(\d{2})$/.exec(answer.value);
     return (match ? formatProfileDate(`1904-${match[1]}-${match[2]}`, false) : formatProfileDate(answer.value, true)) ?? answer.value;
   }
+  if (/_date$/.test(answer.field_key) && /^\d{4}-\d{2}-\d{2}$/.test(answer.value)) return formatProfileDate(answer.value, true) ?? answer.value;
   return answer.value;
 }
 
