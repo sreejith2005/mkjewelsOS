@@ -30,6 +30,9 @@ export type CustomerMasterFunctions = {
   customer_review_decide: { Args: { p_review_id: string; p_same: boolean }; Returns: Json };
   customer_set_data_review: { Args: { p_client_code: string; p_main: boolean }; Returns: Json };
   customer_review_queue: { Args: { p_kind: string; p_offset?: number }; Returns: Json };
+  customer_table: { Args: { p_request: Json }; Returns: Json };
+  customer_table_fields: { Args: Record<string, never>; Returns: Json };
+  customer_table_values: { Args: { p_field: string; p_q?: string | null; p_franchise?: string | null }; Returns: Json };
   customer_ingest_state: { Args: { p_source: string }; Returns: Json };
   customer_ingest_sheet_rows: { Args: { p_source: string; p_rows: Json; p_next_row?: number | null }; Returns: Json };
   customer_ingest_store: { Args: { p_source: string; p_rows: Json; p_options?: Json }; Returns: Json };
