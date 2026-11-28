@@ -2,9 +2,10 @@
 export {
   CUSTOMER_LIST_PAGE_SIZE, loadCustomerClientPage, loadCustomerInteractionPage, loadCustomerList, loadCustomerListFilters,
   loadCustomerProfile, loadCustomerTimeline, loadCustomerReviewList, decideCustomerReview, setCustomerDataReview, loadCustomerReviewQueue,
+  loadCustomerTable, loadCustomerTableFields, loadCustomerTableValues,
 } from "@jewelos/data/customers/api";
 export type {
   CustomerAnswer, CustomerAppointment, CustomerClientPage, CustomerFollowUp, CustomerInteractionPage, CustomerProduct,
   CustomerProfile, CustomerTimelineEntry, CustomerReviewItem, CustomerReviewResult, CustomerReviewSide,
-  CustomerReviewQueueItem, CustomerReviewQueueKind, CustomerReviewQueuePage,
+  CustomerReviewQueueItem, CustomerReviewQueueKind, CustomerReviewQueuePage, CustomerTablePage,
 } from "@jewelos/data/customers/api";

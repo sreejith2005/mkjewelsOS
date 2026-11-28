@@ -1,5 +1,8 @@
 import { getSupabase as db } from "@jewelos/api-client/client";
-import { customerListFilterPayload, type CustomerCallLog, type CustomerListFilterOptions, type CustomerListFilters, type CustomerListPage } from "@jewelos/core";
+import {
+  customerListFilterPayload, customerTableRequest, type CustomerCallLog, type CustomerListFilterOptions, type CustomerListFilters, type CustomerListPage,
+  type CustomerTableField, type CustomerTableState,
+} from "@jewelos/core";
 
 /** One contact on a customer's timeline (public.customer_get_timeline). */
 export type CustomerTimelineEntry = Readonly<{
@@ -217,4 +220,31 @@ export async function loadCustomerInteractionPage(interactionCode: string): Prom
   if (error) throw error;
   // Shape fixed by migration 0413.
   return data as unknown as CustomerInteractionPage;
+}
+
+/** One page of the customer table (public.customer_table, migration 0454). */
+export type CustomerTablePage = Readonly<{
+  total: number; offset: number; limit: number;
+  rows: readonly Readonly<{ client_code: string; values: Readonly<Record<string, unknown>> }>[];
+}>;
+
+export async function loadCustomerTableFields(): Promise<CustomerTableField[]> {
+  const { data, error } = await db().rpc("customer_table_fields", {});
+  if (error) throw error;
+  // Shape fixed by migration 0454.
+  return (data ?? []) as unknown as CustomerTableField[];
+}
+
+export async function loadCustomerTable(state: CustomerTableState, page: number): Promise<CustomerTablePage> {
+  // The server checks every field and operator of the request again.
+  const { data, error } = await db().rpc("customer_table", { p_request: customerTableRequest(state, page) });
+  if (error) throw error;
+  return data as unknown as CustomerTablePage;
+}
+
+/** The values a text or list field holds, most common first (up to 300). */
+export async function loadCustomerTableValues(field: string, query = "", franchise = ""): Promise<{ value: string; count: number }[]> {
+  const { data, error } = await db().rpc("customer_table_values", { p_field: field, p_q: query || null, p_franchise: franchise || null });
+  if (error) throw error;
+  return (data ?? []) as unknown as { value: string; count: number }[];
 }
