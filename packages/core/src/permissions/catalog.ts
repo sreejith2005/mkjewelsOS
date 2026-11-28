@@ -87,6 +87,7 @@ export const PERMISSION_CATALOG = [
   modulePermission("crm.view", "crm", "CRM", "Use CRM", "Clients, walk-ins, interactions, follow-ups, and documents."),
   { key: "crm.manage_forms", kind: "action", category: "CRM", label: "Manage CRM forms", description: "Choose which Form Builder forms CRM uses to register queue clients and leads, and link their questions to CRM answers.", defaultRoles: ["super_admin"], pageId: null },
   { key: "customers.review_duplicates", kind: "action", category: "CRM", label: "Review duplicate customers", description: "Decide whether two customer records flagged \"Possibly same person\" are one person (merge them) or different people (keep or separate them).", defaultRoles: ["super_admin"], pageId: null },
+  { key: "customers.review_data", kind: "action", category: "CRM", label: "Review customer data", description: "Move a customer set aside for a data problem (wrong number, wrong data and so on) back into the main customer list, or set them aside again.", defaultRoles: ["super_admin"], pageId: null },
   modulePermission("notifications.view", "notifications", "Notifications", "Open Notifications", "The notification inbox."),
   { key: "notifications.manage", kind: "action", category: "Notifications", label: "Manage notification rules", description: "Templates, rules, and delivery logs.", defaultRoles: ["super_admin"], pageId: null },
   { ...modulePermission("users.view", "users", "People", "Open Users", "Employee directory."), scopeAuthorities: SCOPE_MANAGERS },

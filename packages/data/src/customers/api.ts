@@ -102,6 +102,12 @@ export type CustomerClientPage = CustomerProfile & Readonly<{
   tags?: readonly string[];
   archived: boolean;
   archive_reason: string | null;
+  /** Migration 0451/0452: bad-data kinds, whether a person moved the customer into the main list, and whether this person may. */
+  data_problems?: readonly string[];
+  data_review?: "main" | null;
+  data_reviewed_at?: string | null;
+  data_reviewed_by?: string | null;
+  can_review_data?: boolean;
 }>;
 
 /** Everything about one interaction (public.customer_get_interaction_page). */
@@ -166,6 +172,12 @@ export async function decideCustomerReview(reviewId: string, same: boolean): Pro
   if (error) throw error;
   // Shape fixed by migration 0438.
   return data as unknown as CustomerReviewResult;
+}
+
+/** Move a customer with a data problem into the main list (main = true) or set them aside again (migration 0452). */
+export async function setCustomerDataReview(clientCode: string, main: boolean): Promise<void> {
+  const { error } = await db().rpc("customer_set_data_review", { p_client_code: clientCode, p_main: main });
+  if (error) throw error;
 }
 
 /**
