@@ -124,6 +124,7 @@ function CustomerMasterList({ onOpenClient, onOpenReview }: { onOpenClient: (cli
   if (filters.followUpDue) chips.push({ label: "Follow-up due", clear: { followUpDue: false } });
   if (filters.dataProblem) chips.push({ label: filters.dataProblem === "any" ? "All data problems" : CUSTOMER_DATA_PROBLEM_LABELS[filters.dataProblem], clear: { dataProblem: "" } });
   const panelFilters = chips.length;
+  const reviewCount = (options?.duplicates_to_review ?? 0) + (options?.same_name_to_review ?? 0) + (options?.shared_phone_to_review ?? 0);
 
   return (
     <section className="w-full">
@@ -138,7 +139,7 @@ function CustomerMasterList({ onOpenClient, onOpenReview }: { onOpenClient: (cli
           {options ? <SheetReadProblems items={options.import} /> : null}
         </div>
         <div className="flex flex-wrap gap-2">
-          {options?.duplicates_to_review ? <Button onClick={onOpenReview} variant="secondary">Possibly same person ({options.duplicates_to_review})</Button> : null}
+          {reviewCount ? <Button onClick={onOpenReview} variant="secondary">Review duplicates ({reviewCount.toLocaleString("en-IN")})</Button> : null}
         </div>
       </header>
 

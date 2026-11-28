@@ -3,7 +3,11 @@ import { ArrowLeft } from "lucide-react";
 import { Button, Notice } from "@/components/ui";
 import { errorMessage } from "@/lib/format";
 import { formatPhone } from "@jewelos/core";
-import { decideCustomerReview, loadCustomerReviewList, type CustomerReviewItem, type CustomerReviewSide } from "./api";
+import { cn } from "@/lib/utils";
+import {
+  decideCustomerReview, loadCustomerReviewList, loadCustomerReviewQueue,
+  type CustomerReviewItem, type CustomerReviewQueueItem, type CustomerReviewQueueKind, type CustomerReviewSide,
+} from "./api";
 import { CodeLink } from "./CustomerProfileView";
 import { formatDate } from "./format";
 import { InfoRow, Tags } from "./parts";
@@ -13,7 +17,123 @@ const RESULT_TEXT: Record<string, string> = {
   kept_separate: "Kept as two customers.",
   kept_joined: "Kept as one customer.",
   separated: "Separated into two customers.",
+  kept_names: "Kept as one customer with both names.",
+  split: "Split off as its own customer in the same family.",
 };
+
+type ReviewTab = "possible" | CustomerReviewQueueKind;
+const TABS: readonly Readonly<{ key: ReviewTab; label: string; help: string }>[] = [
+  { key: "possible", label: "Possibly same person", help: "Two records whose numbers appeared together on a sheet row. Same person merges them into one customer; different people keeps them apart for good." },
+  { key: "same_name", label: "Same name, different numbers", help: "Two records with the same full name and their own numbers. Merge if it is one person who came with a new number (both numbers are kept); keep separate if they are different people. Either way the pair is not asked again." },
+  { key: "shared_phone", label: "One number, different names", help: "One number that was written down with another person's name. Same person keeps the name as an other name. Different people splits that name off as its own customer in the same family, with the sheet rows written under it; the number stays with this customer." },
+];
+
+/** The review page: the three kinds of possible duplicates (migrations 0438, 0453). */
+export function CustomerReviewView({ onBack, onOpenClient }: { onBack: () => void; onOpenClient: (clientCode: string) => void }) {
+  const [tab, setTab] = useState<ReviewTab>("possible");
+  const back = <Button className="-ml-2" onClick={onBack} variant="ghost"><ArrowLeft className="h-4 w-4" />All customers</Button>;
+  const current = TABS.find((item) => item.key === tab);
+  return (
+    <section className="w-full">
+      {back}
+      <header className="mb-3 mt-1">
+        <h1 className="text-xl font-semibold text-task-text">Review duplicates</h1>
+      </header>
+      <div aria-label="Kinds of duplicates" className="mb-3 flex gap-1 overflow-x-auto" role="tablist">
+        {TABS.map((item) => (
+          <button aria-selected={tab === item.key} className={cn("min-h-11 shrink-0 rounded-full border px-4 text-sm font-semibold", tab === item.key ? "border-gold bg-gold/15 text-task-text" : "border-task-border bg-task-bg text-task-text-muted hover:text-task-text")} key={item.key} onClick={() => setTab(item.key)} role="tab" type="button">
+            {item.label}
+          </button>
+        ))}
+      </div>
+      <p className="mb-4 text-sm text-task-text-muted">{current?.help}</p>
+      {tab === "possible" ? <PossibleSamePerson onOpenClient={onOpenClient} /> : <QueueReview key={tab} kind={tab} onOpenClient={onOpenClient} />}
+    </section>
+  );
+}
+
+/** Same name / one number: 25 at a time, with "Show more". */
+function QueueReview({ kind, onOpenClient }: { kind: CustomerReviewQueueKind; onOpenClient: (clientCode: string) => void }) {
+  const [items, setItems] = useState<CustomerReviewQueueItem[] | null>(null);
+  const [total, setTotal] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [done, setDone] = useState<string | null>(null);
+  const [decided, setDecided] = useState(0);
+
+  useEffect(() => {
+    let current = true;
+    loadCustomerReviewQueue(kind).then((page) => { if (current) { setItems([...page.items]); setTotal(page.total); } })
+      .catch((reason: unknown) => { if (current) setError(errorMessage(reason)); });
+    return () => { current = false; };
+  }, [kind]);
+
+  const more = async () => {
+    try {
+      // Decided items have left the queue, so the next page starts that many earlier.
+      const page = await loadCustomerReviewQueue(kind, (items?.length ?? 0));
+      const seen = new Set((items ?? []).map((item) => item.id));
+      setItems((list) => [...(list ?? []), ...page.items.filter((item) => !seen.has(item.id))]);
+      setTotal(page.total);
+    } catch (reason) { setError(errorMessage(reason)); }
+  };
+
+  const decide = async (item: CustomerReviewQueueItem, same: boolean) => {
+    setBusy(item.id); setError(null); setDone(null);
+    try {
+      const result = await decideCustomerReview(item.id, same);
+      setItems((list) => (list ?? []).filter((other) => other.id !== item.id));
+      setTotal((value) => Math.max(0, value - 1));
+      setDecided((value) => value + 1);
+      const who = item.b ? `${item.a.client_code} and ${item.b.client_code}` : `${item.a.client_code} and ${item.other_name ?? "the other name"}`;
+      setDone(`${who}: ${RESULT_TEXT[result.result] ?? "Saved."}`);
+    } catch (reason) {
+      setError(errorMessage(reason));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <>
+      {error ? <div className="mb-3"><Notice tone="danger">{error}</Notice></div> : null}
+      {done ? <div className="mb-3"><Notice tone="success">{done}</Notice></div> : null}
+      {!items && !error ? <p className="mt-6 text-center text-task-text-muted">Loading…</p> : null}
+      {items ? <p className="mb-3 text-sm font-medium text-task-text">{total.toLocaleString("en-IN")} to decide{decided ? `, ${decided} decided now` : ""}</p> : null}
+      {items && items.length === 0 ? <p className="mt-6 text-center text-task-text-muted">Nothing to review.</p> : null}
+      {(items ?? []).map((item) => item.b ? (
+        <article aria-label={`${item.a.client_code} and ${item.b.client_code}`} className="mb-4 rounded-2xl border border-task-border bg-task-bg p-4 shadow-card" key={item.id}>
+          <div className="grid gap-4 md:grid-cols-2">
+            <Side onOpenClient={onOpenClient} side={item.a} title="Record 1 (older)" />
+            <Side onOpenClient={onOpenClient} side={item.b} title="Record 2" />
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-2 sm:flex sm:justify-end">
+            <Button disabled={busy === item.id} onClick={() => void decide(item, false)} variant="secondary">Keep separate</Button>
+            <Button disabled={busy === item.id} onClick={() => void decide(item, true)}>Merge</Button>
+          </div>
+        </article>
+      ) : (
+        <article aria-label={`${item.a.client_code} and ${item.other_name ?? ""}`} className="mb-4 rounded-2xl border border-task-border bg-task-bg p-4 shadow-card" key={item.id}>
+          <div className="grid gap-4 md:grid-cols-2">
+            <Side onOpenClient={onOpenClient} side={item.a} title="Customer with this number" />
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-wide text-task-text-muted">Other name on the same number</p>
+              <p className="mt-1 text-lg font-semibold text-task-text">{item.other_name ?? "Unnamed"}</p>
+              <p className="mt-1 text-sm text-task-text-muted">
+                Written on {item.other_name_rows === 1 ? "1 sheet row" : `${item.other_name_rows ?? 0} sheet rows`}. Splitting it off moves those rows to a new customer in the same family.
+              </p>
+            </div>
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-2 sm:flex sm:justify-end">
+            <Button disabled={busy === item.id} onClick={() => void decide(item, false)} variant="secondary">Different people (split off)</Button>
+            <Button disabled={busy === item.id} onClick={() => void decide(item, true)}>Same person (keep name)</Button>
+          </div>
+        </article>
+      ))}
+      {items && items.length < total ? <div className="flex justify-center"><Button onClick={() => void more()} variant="secondary">Show more</Button></div> : null}
+    </>
+  );
+}
 
 /**
  * "Possibly same person" (/crm/master/review, migration 0438): pairs of
@@ -21,7 +141,7 @@ const RESULT_TEXT: Record<string, string> = {
  * a flagged pair (or keeps a join); different people keep them apart (or
  * separate a join), and the pair is never flagged or joined again.
  */
-export function CustomerReviewView({ onBack, onOpenClient }: { onBack: () => void; onOpenClient: (clientCode: string) => void }) {
+function PossibleSamePerson({ onOpenClient }: { onOpenClient: (clientCode: string) => void }) {
   const [items, setItems] = useState<CustomerReviewItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -46,19 +166,11 @@ export function CustomerReviewView({ onBack, onOpenClient }: { onBack: () => voi
     }
   };
 
-  const back = <Button className="-ml-2" onClick={onBack} variant="ghost"><ArrowLeft className="h-4 w-4" />All customers</Button>;
   const joined = (items ?? []).filter((item) => item.kind === "joined");
   const possible = (items ?? []).filter((item) => item.kind === "possible");
 
   return (
-    <section className="w-full">
-      {back}
-      <header className="mb-4 mt-1">
-        <h1 className="text-xl font-semibold text-task-text">Possibly same person</h1>
-        <p className="mt-1 text-sm text-task-text-muted">
-          Two records whose numbers appeared together on a sheet row. Same person merges them into one customer; different people keeps them apart for good.
-        </p>
-      </header>
+    <>
       {error ? <div className="mb-3"><Notice tone="danger">{error}</Notice></div> : null}
       {done ? <div className="mb-3"><Notice tone="success">{done}</Notice></div> : null}
       {!items && !error ? <p className="mt-6 text-center text-task-text-muted">Loading…</p> : null}
@@ -77,7 +189,7 @@ export function CustomerReviewView({ onBack, onOpenClient }: { onBack: () => voi
           {possible.map((item) => <Pair busy={busy === item.id} item={item} key={item.id} onDecide={decide} onOpenClient={onOpenClient} />)}
         </>
       ) : null}
-    </section>
+    </>
   );
 }
 

@@ -112,6 +112,9 @@ export type CustomerListFilterOptions = Readonly<{
   franchise_view?: readonly string[] | null;
   /** Pairs waiting on the "Possibly same person" review; null without the permission (migration 0438). */
   duplicates_to_review?: number | null;
+  /** Migration 0453: same name with different numbers, and one number with different names, waiting; null without the permission. */
+  same_name_to_review?: number | null;
+  shared_phone_to_review?: number | null;
   /** Customers per bad-data kind, and with any kind (migration 0451). */
   data_problems?: Readonly<Partial<Record<CustomerDataProblem, number>>>;
   with_data_problems?: number;
