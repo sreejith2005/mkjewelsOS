@@ -36,3 +36,12 @@ describe("customer master list filters", () => {
     expect(activeCustomerFilterCount({ ...EMPTY_CUSTOMER_LIST_FILTERS, franchise: "all" })).toBe(0);
   });
 });
+
+describe("data problems filter (migration 0451)", () => {
+  it("leaves bad-data customers out by default and asks for one kind or all", () => {
+    expect(customerListFilterPayload(EMPTY_CUSTOMER_LIST_FILTERS).data_problems).toBeUndefined();
+    expect(customerListFilterPayload({ ...EMPTY_CUSTOMER_LIST_FILTERS, dataProblem: "wrong_number" }).data_problems).toEqual(["wrong_number"]);
+    expect(customerListFilterPayload({ ...EMPTY_CUSTOMER_LIST_FILTERS, dataProblem: "any" }).data_problems).toEqual(["any"]);
+    expect(activeCustomerFilterCount({ ...EMPTY_CUSTOMER_LIST_FILTERS, dataProblem: "staff" })).toBe(1);
+  });
+});
