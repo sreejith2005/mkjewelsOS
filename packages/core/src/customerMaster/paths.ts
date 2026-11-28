@@ -10,13 +10,17 @@ export type CustomerMasterRoute =
   | Readonly<{ view: "client"; code: string }>
   | Readonly<{ view: "interaction"; code: string }>
   | Readonly<{ view: "review" }>
-  | Readonly<{ view: "table" }>;
+  | Readonly<{ view: "table" }>
+  | Readonly<{ view: "standards" }>;
 
 /** The review of records that may be the same person (migration 0438). */
 export const CUSTOMER_REVIEW_PATH = `${CUSTOMER_MASTER_PATH}/review`;
 
 /** Every field as a column, any filter (migration 0454). */
 export const CUSTOMER_TABLE_PATH = `${CUSTOMER_MASTER_PATH}/table`;
+
+/** Data standards: reference values, mapping rules and their review (migration 0455). */
+export const CUSTOMER_STANDARDS_PATH = `${CUSTOMER_MASTER_PATH}/standards`;
 
 const clean = (code: string) => code.trim().toUpperCase();
 
@@ -40,5 +44,6 @@ export function parseCustomerMasterPath(path: string): CustomerMasterRoute | nul
   if (kind === "i" && /^MKI-\d+$/.test(code)) return { view: "interaction", code };
   if (kind === "review") return { view: "review" };
   if (kind === "table") return { view: "table" };
+  if (kind === "standards") return { view: "standards" };
   return { view: "list" };
 }

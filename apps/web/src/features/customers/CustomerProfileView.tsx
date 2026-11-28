@@ -4,7 +4,7 @@ import { Button, Notice } from "@/components/ui";
 import { errorMessage, titleCase } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { callPartsLabel, callSummary, CUSTOMER_DATA_PROBLEM_LABELS, CUSTOMER_STAGE_LABELS, daysAgoLabel, formatPhone, type CustomerDataProblem, type CustomerLifecycleStage } from "@jewelos/core";
-import { loadCustomerClientPage, loadCustomerTimeline, setCustomerDataReview, type CustomerAnswer, type CustomerClientPage, type CustomerTimelineEntry } from "./api";
+import { loadCustomerClientPage, loadCustomerTimeline, setCustomerDataReview, type CustomerAnswer, type CustomerFieldStandard, type CustomerClientPage, type CustomerTimelineEntry } from "./api";
 import { appointmentLabel, channelLabel, followUpLabel, formatDate, formatDateTime, formatProfileDate, RESULT_LABEL, RESULT_TONE } from "./format";
 import { InfoCard, InfoRow, Tags, type EarlierValue } from "./parts";
 
@@ -25,11 +25,12 @@ const CARDS: readonly CardSpec[] = [
     { key: "community", label: "Community" }, { key: "occupation", label: "Occupation" },
   ] },
   { title: "Address", always: true, fields: [
-    { key: "address", label: "Address" }, { key: "city", label: "City" }, { key: "state", label: "State" },
-    { key: "country", label: "Country" }, { key: "pincode", label: "Pincode" },
+    { key: "address", label: "Address" }, { key: "locality", label: "Locality / area" }, { key: "city", label: "City" },
+    { key: "district", label: "District" }, { key: "state", label: "State" }, { key: "country", label: "Country" }, { key: "pincode", label: "Pincode" },
   ] },
   { title: "Store and sales", fields: [
-    { key: "client_category", label: "Ticket size" }, { key: "store", label: "Store" }, { key: "salesperson", label: "Salesperson" }, { key: "lead_source", label: "How they came" },
+    { key: "client_category", label: "Ticket size" }, { key: "store", label: "Store" }, { key: "salesperson", label: "Salesperson" },
+    { key: "acquisition_source", label: "How they found us" }, { key: "lead_source", label: "How they came (as written)" },
     { key: "first_interaction_source", label: "First contact through" }, { key: "buyer_status", label: "Buyer status (as written)" },
     { key: "first_purchase_date", label: "First purchase" }, { key: "recent_purchase_date", label: "Latest purchase" },
     { key: "last_interaction_date", label: "Last interaction (as written)" },
@@ -83,7 +84,34 @@ function fieldOf(answers: readonly CustomerAnswer[], key: string): { current: Cu
   return { current, earlier };
 }
 
-function AnswerRow({ answers, field }: { answers: readonly CustomerAnswer[]; field: FieldSpec }) {
+/** What a reading of a standardized field was taken as (migration 0455). */
+const READING_STATUS: Record<string, string> = {
+  standardized: "standardized", unmapped: "not standardized yet", missing: "not recorded", invalid: "not valid",
+  wrong_field: "belongs to another field", cross_field: "from another field", ambiguous: "unclear, waiting for review", other: "other",
+};
+const RESULT_STATUS: Record<string, string> = {
+  standardized: "Standardized", derived: "Worked out from the city", verified: "Verified", unmapped: "As written, not standardized yet",
+  cross_field: "Taken from another field", conflict: "Differs from the city's state; check", cleared: "Removed on request", other: "Other",
+};
+
+/** A standardized field: the value used, why, and every value as it was written with its source. */
+function StandardRow({ standard, field }: { standard: CustomerFieldStandard; field: FieldSpec }) {
+  const shown = Array.isArray(standard.value) ? standard.value.join(", ") : (standard.value as string | null);
+  const earlier: EarlierValue[] = standard.readings.map((reading) => ({
+    value: `${reading.raw}${reading.value && reading.value !== shown ? ` → ${reading.value}` : ""} (${READING_STATUS[reading.status] ?? reading.status})`,
+    source: reading.source ?? "",
+    date: formatDate(reading.observed_at),
+  }));
+  return (
+    <InfoRow current={standard.status ? RESULT_STATUS[standard.status] ?? standard.status : null} earlier={earlier} empty={!shown} label={field.label}>
+      {shown}
+    </InfoRow>
+  );
+}
+
+function AnswerRow({ answers, field, standards }: { answers: readonly CustomerAnswer[]; field: FieldSpec; standards?: Readonly<Record<string, CustomerFieldStandard>> | undefined }) {
+  const standard = standards?.[field.key];
+  if (standard) return <StandardRow field={field} standard={standard} />;
   const { current, earlier } = fieldOf(answers, field.key);
   return (
     <InfoRow current={current ? `${current.source_label}, ${formatDate(current.observed_at)}` : null} earlier={earlier} empty={!current} label={field.label}>
@@ -262,9 +290,9 @@ export function CustomerProfileView({ clientCode, onBack, onOpenClient, onOpenIn
         </dl>
       </InfoCard>
 
-      {CARDS.filter((card) => card.always || card.fields.some((field) => data.answers.some((answer) => answer.field_key === field.key))).map((card) => (
+      {CARDS.filter((card) => card.always || card.fields.some((field) => data.answers.some((answer) => answer.field_key === field.key) || data.standards?.[field.key])).map((card) => (
         <InfoCard key={card.title} title={card.title}>
-          <dl>{card.fields.map((field) => <AnswerRow answers={data.answers} field={field} key={field.key} />)}</dl>
+          <dl>{card.fields.map((field) => <AnswerRow answers={data.answers} field={field} key={field.key} standards={data.standards} />)}</dl>
         </InfoCard>
       ))}
 

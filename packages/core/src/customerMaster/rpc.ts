@@ -31,6 +31,17 @@ export type CustomerMasterFunctions = {
   customer_set_data_review: { Args: { p_client_code: string; p_main: boolean }; Returns: Json };
   customer_review_queue: { Args: { p_kind: string; p_offset?: number }; Returns: Json };
   customer_table: { Args: { p_request: Json }; Returns: Json };
+  customer_std_overview: { Args: Record<string, never>; Returns: Json };
+  customer_std_queue: { Args: { p_field: string; p_show?: string; p_offset?: number }; Returns: Json };
+  customer_std_preview: { Args: { p_field: string; p_input_key: string }; Returns: Json };
+  customer_std_decide: { Args: { p_field: string; p_input_key: string; p_decision: Json; p_reason?: string | null }; Returns: Json };
+  customer_std_review_draft: { Args: { p_rule_id: string; p_approve: boolean; p_reason?: string | null }; Returns: Json };
+  customer_std_end_rule: { Args: { p_rule_id: string; p_reason: string }; Returns: Json };
+  customer_std_rules: { Args: { p_field: string; p_offset?: number }; Returns: Json };
+  customer_std_set_policy: { Args: { p_field: string; p_policy: string; p_multi?: boolean }; Returns: Json };
+  customer_std_reprocess: { Args: { p_field: string }; Returns: Json };
+  customer_ref_values: { Args: { p_domain: string; p_q?: string | null; p_offset?: number }; Returns: Json };
+  customer_ref_save: { Args: { p_request: Json }; Returns: Json };
   customer_table_fields: { Args: Record<string, never>; Returns: Json };
   customer_table_values: { Args: { p_field: string; p_q?: string | null; p_franchise?: string | null }; Returns: Json };
   customer_ingest_state: { Args: { p_source: string }; Returns: Json };

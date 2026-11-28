@@ -7,12 +7,13 @@ import { CustomerInteractionView } from "@/features/customers/CustomerInteractio
 import { CustomerProfileView } from "@/features/customers/CustomerProfileView";
 import { CustomerReviewView } from "@/features/customers/CustomerReviewView";
 import { CustomerTableView } from "@/features/customers/CustomerTableView";
+import { CustomerStandardsView } from "@/features/customers/CustomerStandardsView";
 import { SheetReadProblems } from "@/features/customers/SheetReadProblems";
 import { formatDate, formatDateTime } from "@/features/customers/format";
 import { Tags } from "@/features/customers/parts";
 import {
   activeCustomerFilterCount, CUSTOMER_CONTACT_LABELS, CUSTOMER_DATA_PROBLEM_LABELS, CUSTOMER_DATA_PROBLEMS, CUSTOMER_SORT_LABELS, CUSTOMER_STAGE_LABELS,
-  CUSTOMER_MASTER_PATH, CUSTOMER_REVIEW_PATH, CUSTOMER_TABLE_PATH, customerInteractionPath, customerProfilePath, daysAgoLabel, EMPTY_CUSTOMER_LIST_FILTERS, formatPhone,
+  CUSTOMER_MASTER_PATH, CUSTOMER_REVIEW_PATH, CUSTOMER_STANDARDS_PATH, CUSTOMER_TABLE_PATH, customerInteractionPath, customerProfilePath, daysAgoLabel, EMPTY_CUSTOMER_LIST_FILTERS, formatPhone,
   parseCustomerMasterPath,
   type CustomerContactWindow, type CustomerDataProblem, type CustomerLifecycleStage, type CustomerListFilterOptions, type CustomerListFilters,
   type CustomerListPage, type CustomerListSort, type CustomerSegment,
@@ -53,11 +54,14 @@ export function CustomerMasterPage({ path, navigate }: { path: string; navigate:
   if (route.view === "interaction") return <CustomerInteractionView interactionCode={route.code} key={route.code} onBack={backToList} onOpenClient={openClient} onOpenInteraction={openInteraction} />;
   if (route.view === "review") return <CustomerReviewView onBack={backToList} onOpenClient={openClient} />;
   if (route.view === "table") return <CustomerTableView onBack={backToList} onOpenClient={openClient} />;
-  return <CustomerMasterList onOpenClient={openClient} onOpenReview={() => navigate(CUSTOMER_REVIEW_PATH)} onOpenTable={() => navigate(CUSTOMER_TABLE_PATH)} />;
+  if (route.view === "standards") return <CustomerStandardsView onBack={backToList} />;
+  return <CustomerMasterList onOpenClient={openClient} onOpenReview={() => navigate(CUSTOMER_REVIEW_PATH)} onOpenStandards={() => navigate(CUSTOMER_STANDARDS_PATH)} onOpenTable={() => navigate(CUSTOMER_TABLE_PATH)} />;
 }
 
 /** Every client and lead in one filtered list (/crm/master). */
-function CustomerMasterList({ onOpenClient, onOpenReview, onOpenTable }: { onOpenClient: (clientCode: string) => void; onOpenReview: () => void; onOpenTable: () => void }) {
+function CustomerMasterList({ onOpenClient, onOpenReview, onOpenStandards, onOpenTable }: {
+  onOpenClient: (clientCode: string) => void; onOpenReview: () => void; onOpenStandards: () => void; onOpenTable: () => void;
+}) {
   const [filters, setFilters] = useState<CustomerListFilters>(() => ({ ...EMPTY_CUSTOMER_LIST_FILTERS, ...remembered?.filters }));
   const [searchText, setSearchText] = useState(() => remembered?.searchText ?? "");
   const [page, setPage] = useState(() => remembered?.page ?? 0);
@@ -142,6 +146,7 @@ function CustomerMasterList({ onOpenClient, onOpenReview, onOpenTable }: { onOpe
         </div>
         <div className="flex flex-wrap gap-2">
           <Button onClick={onOpenTable} variant="secondary">Table view</Button>
+          {options?.can_view_data_quality ? <Button onClick={onOpenStandards} variant="secondary">Data standards</Button> : null}
           {reviewCount ? <Button onClick={onOpenReview} variant="secondary">Review duplicates ({reviewCount.toLocaleString("en-IN")})</Button> : null}
         </div>
       </header>

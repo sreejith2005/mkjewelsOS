@@ -9,6 +9,8 @@ export type CustomerFieldType = "text" | "number" | "date" | "datetime" | "boole
 
 export type CustomerTableField = Readonly<{
   key: string; label: string; card: string; type: CustomerFieldType; filterable: boolean; sortable: boolean;
+  /** Migration 0455: values are reference values with stable codes ("place:mumbai"). */
+  standardized?: boolean; meaning?: string | null;
 }>;
 
 export type CustomerFilterOperator =
@@ -131,6 +133,12 @@ export function customerTableRequest(state: CustomerTableState, page: number, pa
     limit: pageSize,
     offset: Math.max(0, page) * pageSize,
   };
+}
+
+/** A reference code's readable tail, for a selection whose label is not loaded ("place:navi-mumbai" -> "navi mumbai"). */
+export function customerCodeFallbackLabel(code: string): string {
+  const tail = code.includes(":") ? code.slice(code.indexOf(":") + 1) : code;
+  return tail.replace(/-/g, " ");
 }
 
 /** A table cell as text: lists joined, dates in Indian format, yes/no. */
